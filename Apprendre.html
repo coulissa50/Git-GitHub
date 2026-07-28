@@ -1,0 +1,2320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carte mentale — Git &amp; GitHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E7EAE1;
+  --paper-2:#F4F5EF;
+  --ink:#0F1A20;
+  --ink-2:#53606A;
+  --ink-3:#8C97A0;
+  --rule:rgba(15,26,32,.16);
+  --grid:rgba(15,26,32,.055);
+  --amber:#B07200;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"IBM Plex Sans Condensed",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px;
+  line-height:1.35;
+  -webkit-font-smoothing:antialiased;
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:64px 64px,64px 64px;
+}
+
+/* ---------- Cartouche (en-tête façon légende de carte) ---------- */
+header.cartouche{
+  position:sticky;top:0;z-index:40;
+  background:rgba(231,234,225,.94);
+  backdrop-filter:blur(8px);
+  border-bottom:1.5px solid var(--ink);
+}
+.cartouche-in{max-width:1600px;margin:0 auto;padding:14px 22px 0}
+.titleline{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+h1{
+  font-family:"Bricolage Grotesque",Georgia,serif;
+  font-weight:800;font-size:clamp(22px,3.2vw,34px);
+  letter-spacing:-.02em;margin:0;line-height:1;
+}
+h1 .plus{color:var(--amber)}
+.sub{
+  font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-2);padding-bottom:3px;
+}
+.scalebar{display:flex;align-items:center;gap:7px;margin-left:auto;padding-bottom:2px}
+.scalebar .bar{display:flex;height:9px;border:1px solid var(--ink)}
+.scalebar .bar i{width:26px;display:block}
+.scalebar .bar i:nth-child(odd){background:var(--ink)}
+.scalebar span{font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--ink-2)}
+
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 10px}
+.search{position:relative;flex:1 1 300px;max-width:440px}
+.search input{
+  width:100%;padding:9px 34px 9px 12px;
+  border:1.5px solid var(--ink);background:var(--paper-2);color:var(--ink);
+  font-family:"JetBrains Mono",monospace;font-size:13px;border-radius:0;
+}
+.search input:focus{outline:2px solid var(--amber);outline-offset:1px}
+.search .clr{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  border:0;background:none;cursor:pointer;color:var(--ink-3);font-size:17px;line-height:1;padding:2px 4px;
+}
+button.tool{
+  border:1.5px solid var(--ink);background:transparent;color:var(--ink);
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-size:13px;
+  padding:8px 12px;cursor:pointer;letter-spacing:.02em;
+}
+button.tool:hover{background:var(--ink);color:var(--paper)}
+button.tool:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.count{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-2);margin-left:auto}
+
+.legend{display:flex;flex-wrap:wrap;gap:4px 6px;padding:0 0 12px}
+.legend button{
+  display:inline-flex;align-items:center;gap:6px;
+  border:1px solid var(--rule);background:var(--paper-2);cursor:pointer;
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-size:12px;color:var(--ink-2);
+  padding:4px 9px 4px 6px;
+}
+.legend button:hover{border-color:var(--c);color:var(--ink)}
+.legend button i{width:9px;height:9px;background:var(--c);display:block;flex:none}
+
+/* ---------- Carte ---------- */
+main{max-width:1600px;margin:0 auto;padding:26px 22px 90px}
+.mapscroll{overflow-x:auto;padding-bottom:14px}
+#map{position:relative;display:inline-block;min-width:100%}
+#wires{position:absolute;inset:0;pointer-events:none;overflow:visible}
+#wires path{fill:none;stroke-linecap:round}
+
+.sub{display:flex;align-items:center;gap:26px}
+.children{display:flex;flex-direction:column;gap:5px;padding:5px 0}
+.sub.collapsed > .children{display:none}
+
+.node{position:relative;z-index:2;white-space:nowrap}
+
+/* racine */
+.node.root{
+  font-family:"Bricolage Grotesque",serif;font-weight:800;font-size:21px;
+  background:var(--ink);color:var(--paper);padding:14px 20px;letter-spacing:-.01em;
+  box-shadow:5px 5px 0 rgba(15,26,32,.18);
+}
+.node.root small{display:block;font-family:"JetBrains Mono",monospace;font-weight:400;font-size:10.5px;letter-spacing:.1em;opacity:.65;margin-top:5px}
+
+/* niveau 1 : branches */
+.node.l1 > button{
+  font-family:"Bricolage Grotesque",serif;font-weight:600;font-size:16.5px;letter-spacing:-.01em;
+  background:var(--paper-2);color:var(--ink);
+  border:0;border-left:5px solid var(--c);
+  padding:8px 13px 8px 11px;cursor:pointer;text-align:left;
+  box-shadow:0 1px 0 var(--c);
+}
+/* niveau 2 : sous-branches */
+.node.l2 > button{
+  font-size:14px;font-weight:600;color:var(--c);
+  background:transparent;border:0;border-bottom:1.5px solid var(--c);
+  padding:3px 4px;cursor:pointer;text-align:left;letter-spacing:.01em;
+}
+.node > button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.node > button .caret{display:inline-block;width:9px;font-size:10px;opacity:.5;margin-right:5px;transition:transform .18s}
+.sub.collapsed > .node > button .caret{transform:rotate(-90deg)}
+.node > button:hover .caret{opacity:1}
+
+/* feuilles : lignes de commande */
+.leaf{
+  white-space:normal;max-width:74ch;
+  padding:2px 0 2px 10px;border-left:2px solid transparent;
+  cursor:copy;
+}
+.leaf:hover{border-left-color:var(--c);background:rgba(255,255,255,.5)}
+.leaf code{
+  font-family:"JetBrains Mono",monospace;font-size:12.4px;line-height:1.45;
+  color:var(--ink);display:block;white-space:pre-wrap;word-break:break-word;
+}
+.leaf .note{
+  display:block;font-size:12px;color:var(--ink-2);font-style:italic;margin-top:1px;
+}
+.leaf.copied{background:rgba(176,114,0,.16);border-left-color:var(--amber)}
+.leaf mark, .node button mark{background:rgba(176,114,0,.3);color:inherit;padding:0 1px}
+
+.hidden{display:none !important}
+
+/* ---------- Pied ---------- */
+footer{
+  max-width:1600px;margin:0 auto;padding:20px 22px 50px;
+  border-top:1.5px solid var(--ink);
+  font-size:12.5px;color:var(--ink-2);
+  display:flex;gap:26px;flex-wrap:wrap;
+}
+footer b{color:var(--ink);font-weight:600}
+kbd{font-family:"JetBrains Mono",monospace;font-size:11px;border:1px solid var(--rule);padding:1px 4px;background:var(--paper-2)}
+
+#toast{
+  position:fixed;left:50%;bottom:24px;transform:translate(-50%,14px);
+  background:var(--ink);color:var(--paper);padding:9px 16px;
+  font-family:"JetBrains Mono",monospace;font-size:12px;
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:60;
+}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- Mobile : arbre indenté, sans câbles ---------- */
+@media (max-width:900px){
+  #wires{display:none}
+  .sub{flex-direction:column;align-items:flex-start;gap:0}
+  .children{padding-left:14px;border-left:1.5px dotted var(--c);margin-left:6px;gap:7px}
+  .node.root{font-size:18px}
+  .leaf{max-width:100%}
+  main{padding:18px 14px 70px}
+}
+
+
+/* ---------- Bouton info & panneau de fiche ---------- */
+.node.l1, .node.l2{display:inline-flex;align-items:center;gap:7px}
+button.info{
+  flex:none;width:19px;height:19px;border-radius:50%;
+  border:1.2px solid var(--c);background:transparent;color:var(--c);
+  font-family:"Bricolage Grotesque",serif;font-weight:600;font-size:11px;line-height:1;
+  cursor:pointer;padding:0;opacity:.55;
+}
+button.info:hover{background:var(--c);color:var(--paper-2);opacity:1}
+button.info:focus-visible{outline:2px solid var(--amber);outline-offset:2px;opacity:1}
+button.tool.primary{background:var(--ink);color:var(--paper)}
+button.tool.primary:hover{background:var(--amber);border-color:var(--amber)}
+
+#fiche{
+  position:fixed;top:0;right:0;z-index:70;
+  width:min(470px,100vw);height:100vh;
+  background:var(--paper-2);border-left:2px solid var(--ink);
+  box-shadow:-12px 0 34px rgba(15,26,32,.14);
+  transform:translateX(103%);transition:transform .22s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+}
+#fiche.on{transform:none}
+#fiche header{
+  border-bottom:1.5px solid var(--ink);border-top:6px solid var(--c,#2E3A46);
+  padding:13px 16px 11px;display:flex;align-items:flex-start;gap:10px;flex:none;
+}
+#fiche h2{
+  font-family:"Bricolage Grotesque",serif;font-weight:600;font-size:17px;
+  margin:0;letter-spacing:-.01em;line-height:1.2;
+}
+#fiche .kind{
+  display:block;font-family:"JetBrains Mono",monospace;font-size:10px;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--c,#555);margin-bottom:4px;
+}
+#fiche .close{
+  margin-left:auto;flex:none;border:1.5px solid var(--ink);background:transparent;
+  cursor:pointer;font-size:16px;line-height:1;padding:3px 8px;color:var(--ink);
+}
+#fiche .close:hover{background:var(--ink);color:var(--paper)}
+#fiche .body{overflow-y:auto;padding:16px;flex:1}
+#fiche h3{
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--ink-2);
+  margin:20px 0 7px;padding-bottom:4px;border-bottom:1px solid var(--rule);
+}
+#fiche h3:first-child{margin-top:0}
+#fiche p{margin:0 0 9px;font-size:14.5px;line-height:1.5}
+#fiche ul{margin:0;padding-left:17px}
+#fiche li{font-size:14px;line-height:1.5;margin-bottom:7px}
+#fiche pre{
+  margin:0;background:var(--paper);border:1px solid var(--rule);border-left:3px solid var(--c,#333);
+  padding:11px 12px;overflow-x:auto;
+  font-family:"JetBrains Mono",monospace;font-size:12.2px;line-height:1.5;white-space:pre;
+}
+#fiche .excopy{
+  margin-top:6px;border:1px solid var(--rule);background:transparent;cursor:pointer;
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-size:12px;color:var(--ink-2);padding:4px 9px;
+}
+#fiche .excopy:hover{border-color:var(--ink);color:var(--ink)}
+#fiche .piege{
+  background:rgba(176,114,0,.11);border-left:3px solid var(--amber);
+  padding:10px 12px;font-size:14px;line-height:1.5;
+}
+#fiche .liens a{
+  display:block;color:var(--ink);font-size:13.5px;padding:5px 0;
+  border-bottom:1px dotted var(--rule);text-decoration:none;
+}
+#fiche .liens a:hover{color:var(--amber)}
+#fiche .liens a::after{content:" ↗";font-size:11px;color:var(--ink-3)}
+#fiche .voir{display:flex;flex-wrap:wrap;gap:5px}
+#fiche .voir button{
+  border:1px solid var(--rule);background:var(--paper);cursor:pointer;
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-size:12.5px;color:var(--ink);padding:4px 9px;
+}
+#fiche .voir button:hover{border-color:var(--amber);background:rgba(176,114,0,.1)}
+#fiche code{font-family:"JetBrains Mono",monospace;font-size:12.5px;background:var(--paper);padding:0 3px}
+.node.flash > button{outline:2.5px solid var(--amber);outline-offset:3px}
+
+@media (max-width:900px){
+  #fiche{width:100vw;height:88vh;top:auto;bottom:0;border-left:0;border-top:2px solid var(--ink);
+         transform:translateY(103%)}
+  #fiche.on{transform:none}
+}
+@media print{#fiche{display:none}}
+
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+
+@media print{
+  body{background:#fff}
+  header.cartouche{position:static}
+  .tools,.legend,footer,#toast{display:none}
+  .sub{break-inside:avoid}
+  .node.l1 > button{box-shadow:none}
+}
+</style>
+</head>
+<body>
+
+<header class="cartouche">
+  <div class="cartouche-in">
+    <div class="titleline">
+      <h1>Git <span class="plus">+</span> GitHub</h1>
+      <div class="sub">Du premier commit à la pull request · et les urgences</div>
+      <div class="scalebar">
+        <div class="bar"><i></i><i></i><i></i><i></i></div>
+        <span>cliquer une ligne = copier</span>
+      </div>
+    </div>
+
+    <div class="tools">
+      <div class="search">
+        <input id="q" type="search" placeholder="Filtrer : rebase, stash, conflit, secret, actions…" autocomplete="off" spellcheck="false">
+        <button class="clr" id="clr" title="Effacer" aria-label="Effacer le filtre">×</button>
+      </div>
+      <button class="tool primary" id="guide">Parcours débutant</button>
+      <button class="tool" id="aide">Mode d'emploi</button>
+      <button class="tool" id="expand">Tout déplier</button>
+      <button class="tool" id="collapse">Vue d'ensemble</button>
+      <button class="tool" id="print">Imprimer</button>
+      <span class="count" id="count"></span>
+    </div>
+
+    <nav class="legend" id="legend" aria-label="Branches"></nav>
+  </div>
+</header>
+
+<main>
+  <div class="mapscroll">
+    <div id="map"><svg id="wires" aria-hidden="true"></svg></div>
+  </div>
+</main>
+
+<footer>
+  <div><b>Lire la carte</b><br>Racine → branche → sous-branche → commande. Cliquer un titre plie/déplie.</div>
+  <div><b>Copier</b><br>Un clic sur une ligne de code la met dans le presse-papiers.</div>
+  <div><b>Comprendre</b><br>Le bouton <b>ⓘ</b> près d'un titre ouvre une fiche : explication, exemple exécutable, piège, doc.</div>
+  <div><b>Chercher</b><br><kbd>/</kbd> place le curseur dans le filtre ; <kbd>Échap</kbd> l'efface.</div>
+  <div><b>Notation</b><br><code style="font-family:'JetBrains Mono',monospace">a3f5c9e</code> = empreinte de commit, <code style="font-family:'JetBrains Mono',monospace">origin</code> = dépôt distant, <code style="font-family:'JetBrains Mono',monospace">main</code> = branche principale. ⚠ signale une commande destructrice.</div>
+</footer>
+
+
+<aside id="fiche" aria-hidden="true" aria-label="Fiche explicative">
+  <header>
+    <div><span class="kind" id="fiche-kind"></span><h2 id="fiche-titre"></h2></div>
+    <button class="close" id="fiche-close" aria-label="Fermer la fiche">×</button>
+  </header>
+  <div class="body" id="fiche-body"></div>
+</aside>
+
+<div id="toast">Copié</div>
+
+<script>
+/* =======================================================================
+   FICHES PÉDAGOGIQUES
+   q = à quoi ça sert · ex = exemple concret exécutable · p = piège
+   doc = [[url, libellé]…] · see = renvois internes dans la carte
+   ======================================================================= */
+const GD = 'https://git-scm.com/docs/git-';
+const GH = 'https://docs.github.com/fr/';
+const PROGIT = ['https://git-scm.com/book/fr/v2', 'Pro Git — le livre de référence, en français'];
+const LGB = ['https://learngitbranching.js.org/?locale=fr_FR', 'Learn Git Branching — exercices visuels en français'];
+
+const FICHES = {
+
+/* ---------- méta ---------- */
+"__UI":{
+  ti:"Mode d'emploi de la carte",
+  q:"La carte se lit de gauche à droite : la racine porte 16 branches (les grands domaines de Git et GitHub), chaque branche porte des sous-branches (les tâches), et chaque sous-branche porte les commandes réelles, prêtes à copier dans un terminal.",
+  li:[
+    "<b>Cliquer un titre</b> déplie ou replie sa partie de l'arbre.",
+    "<b>Le bouton ⓘ</b> ouvre une fiche : explication, exemple complet, piège fréquent, lien vers la documentation française.",
+    "<b>Cliquer une ligne de commande</b> la copie dans le presse-papiers.",
+    "<b>Le filtre</b> cherche dans toutes les commandes à la fois (essayez « rebase », « stash », « secret », « conflit »).",
+    "<b>Vue d'ensemble</b> remet la carte à son état de départ ; <b>Tout déplier</b> ouvre tout ; <b>Imprimer</b> met en page pour un PDF.",
+    "<b>Clavier</b> : <kbd>/</kbd> pour aller au filtre, <kbd>Échap</kbd> pour fermer une fiche."
+  ],
+  ex:`# Les commandes se copient telles quelles dans un terminal
+# (PowerShell, Git Bash, Terminal macOS ou Linux)
+
+git status        # où j'en suis
+git add .         # je prépare
+git commit -m "…" # j'enregistre
+git push          # j'envoie`,
+  p:"Les branches 7 (Annuler & réparer) et 16 (Dépannage & urgences) sont celles qu'on ouvre en panique. Lisez-les une fois à froid : c'est bien plus efficace que de les découvrir le jour où quelque chose casse."
+},
+
+"__PARCOURS":{
+  ti:"Parcours débutant — de zéro au premier push",
+  q:"Git s'apprend par couches. Les six premières étapes suffisent à travailler seul en toute sécurité ; les quatre suivantes ouvrent le travail à plusieurs. Comptez une heure pour les six premières.",
+  li:[
+    "<b>1. Configurer</b> — nom, courriel, branche main par défaut. Une seule fois par poste. → branche <i>Concepts & configuration</i>",
+    "<b>2. Comprendre les quatre zones</b> — répertoire, index, dépôt local, dépôt distant. Tout le reste en découle. → branche <i>Concepts</i>",
+    "<b>3. Le cycle</b> — status, add, commit, répété jusqu'à l'automatisme. → branche <i>Le cycle quotidien</i>",
+    "<b>4. Relire son passé</b> — log, show, diff. → branche <i>Explorer l'historique</i>",
+    "<b>5. Annuler</b> — restore, amend, revert, et surtout reflog. C'est ce qui enlève la peur. → branche <i>Annuler & réparer</i>",
+    "<b>6. Brancher</b> — créer une branche, y travailler, la fusionner. → branche <i>Branches</i>",
+    "<b>7. Publier</b> — dépôt GitHub, remote, push. → branches <i>Créer un dépôt</i> et <i>Dépôts distants</i>",
+    "<b>8. Collaborer</b> — pull request, relecture, fusion. → branche <i>GitHub — collaborer</i>",
+    "<b>9. Sécuriser</b> — clé SSH, .gitignore, protection de main. → branche <i>Sécurité</i>",
+    "<b>10. Automatiser</b> — un premier workflow GitHub Actions. → branche <i>GitHub Actions</i>"
+  ],
+  ex:`# ── Exercice complet : du dossier vide au dépôt GitHub ──
+
+# 1. configuration (une seule fois par poste)
+git config --global user.name "Prénom Nom"
+git config --global user.email "prenom.nom@exemple.ca"
+git config --global init.defaultBranch main
+
+# 2. créer le dépôt
+mkdir essai-git && cd essai-git
+git init
+echo "# Essai Git" > README.md
+git status                      # README.md apparaît en "untracked"
+
+# 3. premier commit
+git add README.md
+git commit -m "Ajoute le README"
+git log --oneline               # un commit existe
+
+# 4. une branche, une modification, une fusion
+git switch -c ajout-licence
+echo "MIT" > LICENSE
+git add LICENSE
+git commit -m "Ajoute la licence MIT"
+git switch main
+git merge ajout-licence
+git branch -d ajout-licence
+
+# 5. annuler pour de faux, et récupérer
+git reset --hard HEAD~1         # le commit de fusion disparaît
+git reflog                      # il est toujours listé
+git reset --hard HEAD@{1}       # tout revient
+
+# 6. publier sur GitHub
+gh repo create essai-git --public --source=. --push
+# ou, sans GitHub CLI :
+# git remote add origin https://github.com/moi/essai-git.git
+# git push -u origin main`,
+  p:"Étape 5 : faites-la vraiment. Casser volontairement un dépôt d'essai puis le récupérer avec reflog est le meilleur investissement de tout l'apprentissage de Git — après, plus rien ne fait peur.",
+  doc:[LGB, PROGIT, [GH+'get-started', 'Prise en main de GitHub (en français)']]
+},
+
+/* ---------- 1 ---------- */
+"Concepts & configuration":{
+  q:"Git enregistre l'histoire de vos fichiers en local ; GitHub héberge cette histoire et ajoute la collaboration. Comprendre les quatre zones — répertoire de travail, index, dépôt local, dépôt distant — dispense d'apprendre les commandes par cœur : chacune ne fait que déplacer des choses d'une zone à l'autre.",
+  ex:`# la configuration à faire une fois par poste
+git config --global user.name "Prénom Nom"
+git config --global user.email "prenom.nom@exemple.ca"
+git config --global init.defaultBranch main
+git config --global pull.rebase false
+git config --global core.autocrlf true      # Windows
+
+git config --list --show-origin              # tout vérifier`,
+  p:"Un courriel différent de celui du compte GitHub fait apparaître des commits « fantômes », non rattachés à votre profil. Vérifiez-le avant le premier commit d'un nouveau poste.",
+  doc:[PROGIT, LGB, [GD+'config', 'git config (référence)']]
+},
+"Le modèle mental":{
+  q:"Un commit n'est pas une différence : c'est une photo complète du projet à un instant, reliée à son parent. Une branche n'est qu'une étiquette collée sur un commit, qui avance à chaque nouveau commit. Toute la souplesse de Git vient de là.",
+  ex:`# les quatre zones, illustrées
+vim rapport.md         # 1. répertoire de travail : je modifie
+git add rapport.md     # 2. index : je prépare ce qui ira dans le commit
+git commit -m "…"      # 3. dépôt local : c'est gravé
+git push               # 4. dépôt distant : c'est partagé
+
+git status             # dit toujours dans quelle zone se trouve chaque fichier`,
+  p:"L'index (staging) déroute au début, mais c'est lui qui permet de committer une partie seulement de son travail — par exemple la correction de bug sans le brouillon en cours."
+},
+"Installer & vérifier":{
+  q:"Installer Git et savoir vérifier son état. Sous Windows, l'installateur fournit aussi Git Bash, qui donne un terminal Unix confortable — mais Git fonctionne parfaitement dans PowerShell.",
+  ex:`git --version
+git config --list --show-origin
+git help merge        # documentation locale, sans Internet`,
+  p:"Sous Windows, si « git » n'est pas reconnu, c'est le PATH : rouvrez le terminal après l'installation, ou réinstallez en cochant « Git from the command line and also from 3rd-party software »."
+},
+"Configuration minimale":{
+  q:"Cinq réglages suffisent pour travailler sereinement. --global vaut pour tous vos dépôts ; sans --global, le réglage ne concerne que le dépôt courant — pratique pour un projet professionnel avec un autre courriel.",
+  ex:`git config --global user.name "Prénom Nom"
+git config --global user.email "moi@exemple.ca"
+git config --global init.defaultBranch main
+git config --global core.editor "code --wait"
+git config --global pull.rebase false
+
+# dans un dépôt précis, une identité différente
+cd projet-client
+git config user.email "moi@client.com"`,
+  p:"Sans le réglage pull.rebase, Git interrompt chaque git pull divergent par un message demandant de choisir une stratégie. Décidez une fois pour toutes, et la question ne revient plus.",
+  doc:[[GD+'config','git config (référence)']]
+},
+"Alias qui font gagner du temps":{
+  q:"Un alias est un raccourci Git. Trois ou quatre bien choisis évitent des centaines de frappes, et rendent l'historique lisible en un caractère.",
+  ex:`git config --global alias.lg "log --oneline --graph --decorate --all"
+git config --global alias.st "status -sb"
+git config --global alias.unstage "restore --staged"
+
+git lg        # l'arbre complet des branches
+git st        # état compact
+git unstage fichier.py`,
+  p:"N'aliasez pas les commandes destructrices (reset --hard, clean -fdx) : leur longueur fait partie de la sécurité."
+},
+
+/* ---------- 2 ---------- */
+"Créer ou cloner un dépôt":{
+  q:"Deux points de départ : un dossier existant qu'on transforme en dépôt (git init), ou un dépôt distant qu'on récupère (git clone). Dans les deux cas, la première chose à écrire ensuite est le .gitignore — avant le premier commit, tant qu'il est encore facile de ne rien versionner de gênant.",
+  ex:`# projet local, publié ensuite sur GitHub
+mkdir analyse-parcelles && cd analyse-parcelles
+git init
+printf "__pycache__/\\n.venv/\\n.env\\n*.gdb/\\n" > .gitignore
+git add .
+git commit -m "Initialise le projet"
+gh repo create analyse-parcelles --private --source=. --push`,
+  p:"Un fichier committé une fois reste dans l'historique pour toujours, même supprimé ensuite. C'est pourquoi le .gitignore se rédige avant le premier git add, pas après.",
+  doc:[[GD+'init','git init'],[GD+'clone','git clone'],PROGIT]
+},
+"Partir de zéro":{
+  q:"Transformer un dossier de travail en dépôt Git, puis le rattacher à GitHub. La séquence est toujours la même : init, premier commit, remote, push.",
+  ex:`git init
+git add .
+git commit -m "Premier commit"
+git branch -M main
+git remote add origin https://github.com/moi/projet.git
+git push -u origin main`,
+  p:"Créez le dépôt GitHub VIDE (sans README ni licence auto-générés) : sinon les deux historiques divergent dès le départ et le premier push est refusé."
+},
+"Cloner un dépôt existant":{
+  q:"Récupérer un dépôt complet : tous les fichiers, tout l'historique, toutes les branches. Le dépôt d'origine devient automatiquement le distant nommé origin.",
+  ex:`git clone git@github.com:org/projet.git
+cd projet
+git remote -v          # origin pointe vers GitHub
+git branch -a          # les branches distantes sont visibles`,
+  p:"Ne clonez pas un dépôt à l'intérieur d'un autre dépôt Git : les deux .git se marchent dessus. Pour cet usage, ce sont les sous-modules qu'il faut."
+},
+".gitignore":{
+  q:"Le fichier qui dit à Git ce qu'il doit ignorer : environnements virtuels, fichiers temporaires, données volumineuses et surtout secrets. Il se place à la racine et se versionne comme les autres fichiers.",
+  ex:`# .gitignore d'un projet Python
+__pycache__/
+*.pyc
+.venv/
+.env                 # ← le plus important : les identifiants
+*.log
+.vscode/
+
+# vérifier pourquoi un fichier est ignoré
+git check-ignore -v data/gros.gdb`,
+  p:".gitignore n'agit que sur les fichiers NON encore suivis. Si le fichier a déjà été committé, il faut d'abord le retirer de l'index : git rm --cached .env",
+  doc:[['https://github.com/github/gitignore','Modèles .gitignore officiels par langage']],
+  see:["Secrets & analyse"]
+},
+"Fichiers d'accompagnement":{
+  q:"Quatre fichiers que GitHub reconnaît et met en valeur automatiquement. Le README est lu par tout le monde ; la licence détermine ce que les autres ont le droit de faire de votre travail.",
+  ex:`projet/
+├── README.md          # affiché en page d'accueil du dépôt
+├── LICENSE            # conditions de réutilisation
+├── .gitignore
+├── .gitattributes     # * text=auto  → fins de ligne cohérentes
+└── CONTRIBUTING.md    # comment proposer une contribution`,
+  p:"Sans fichier LICENSE, le code est par défaut « tous droits réservés » : un dépôt public sans licence n'est pas réutilisable légalement, même s'il est visible de tous.",
+  see:["Licence & gouvernance"]
+},
+
+/* ---------- 3 ---------- */
+"Le cycle quotidien":{
+  q:"Quatre commandes tournent en boucle : status pour voir, add pour préparer, commit pour enregistrer, push pour partager. Une fois ce cycle automatique, l'essentiel de Git est acquis — tout le reste sert à réparer, brancher ou collaborer.",
+  ex:`git status                       # que s'est-il passé ?
+git diff                         # qu'ai-je changé exactement ?
+git add traitement.py            # je prépare ce fichier
+git status                       # vérification
+git commit -m "Corrige le calcul des surfaces"
+git push`,
+  p:"Committer une fois par jour, tout en vrac, revient à ne rien versionner d'utile. Un commit doit répondre à une seule question : « qu'est-ce que ce changement accomplit ? »",
+  doc:[[GD+'commit','git commit'],[GD+'add','git add'],PROGIT],
+  see:["Écrire un bon message"]
+},
+"Voir où j'en suis":{
+  q:"status répond à « qu'est-ce qui a changé et où en est chaque fichier ». diff répond à « qu'est-ce qui a changé exactement, ligne par ligne ». Ce sont les deux commandes à taper le plus souvent — et elles ne modifient jamais rien.",
+  ex:`git status -sb
+#  M  traitement.py     ← modifié ET indexé
+#   M rapport.md        ← modifié, PAS indexé
+#  ?? brouillon.txt     ← non suivi
+
+git diff                # ce qui n'est pas encore indexé
+git diff --staged       # ce qui partira au prochain commit`,
+  p:"git diff seul ne montre RIEN après un git add : le fichier est passé dans l'index. C'est git diff --staged qu'il faut alors regarder."
+},
+"Indexer (add)":{
+  q:"L'index est la table de préparation : on y pose ce qui doit entrer dans le prochain commit. Cette étape supplémentaire permet de découper un travail désordonné en commits propres.",
+  ex:`git add -p traitement.py
+# Git présente chaque bloc modifié :
+#   y = inclure ce bloc   n = passer   s = découper plus finement
+#   q = arrêter
+
+git commit -m "fix: corrige l'arrondi des surfaces"
+# le reste des modifications est toujours là, pour un autre commit`,
+  p:"git add . inclut aussi les fichiers non suivis du dossier courant. Regardez toujours git status avant : c'est ainsi qu'un .env ou un fichier de 200 Mo se retrouve committé par inadvertance."
+},
+"Enregistrer (commit)":{
+  q:"Le commit grave dans l'historique local ce qui se trouve dans l'index. Il est permanent — mais tant qu'il n'est pas poussé, il reste entièrement modifiable.",
+  ex:`git commit -m "feat: ajoute l'export GeoJSON"
+
+# oubli d'un fichier ? On répare sans créer de commit supplémentaire
+git add fichier_oublie.py
+git commit --amend --no-edit`,
+  p:"--amend crée en réalité un NOUVEAU commit et jette l'ancien. Sur un commit déjà poussé, cela réécrit l'histoire partagée : ne l'utilisez que sur du local.",
+  doc:[[GD+'commit','git commit']]
+},
+"Écrire un bon message":{
+  q:"Le message est le seul endroit où consigner le POURQUOI d'un changement : le diff montre déjà le quoi. Six mois plus tard, c'est ce qui distingue un historique exploitable d'une suite de « maj » inutilisables.",
+  ex:`git commit -m "fix: corrige la projection des parcelles importées
+
+Les données SNB arrivent en EPSG:2036 alors que le reste du projet
+est en 2953. Sans reprojection, les parcelles se retrouvaient
+décalées d'environ 200 m vers l'ouest.
+
+Fixes #17"`,
+  p:"« maj », « wip », « fix » seuls, ou « correction du bug » : ces messages font perdre du temps à tout le monde, y compris à vous dans trois mois. Une phrase à l'impératif, ≤ 50 caractères, et le détail en dessous."
+},
+"Annuler avant commit":{
+  q:"Défaire des modifications qui ne sont pas encore committées. Attention : contrairement à presque tout le reste dans Git, cette annulation-là est définitive — ce qui n'a jamais été committé ne se récupère pas.",
+  ex:`git restore rapport.md          # jette les modifications du fichier
+git restore --staged rapport.md # le sort de l'index, garde les modifications
+git restore .                   # ⚠ jette TOUT ce qui n'est pas indexé`,
+  p:"En cas de doute avant un git restore massif, faites plutôt git stash : le travail est mis de côté au lieu d'être détruit, et se récupère avec git stash pop.",
+  see:["git stash"]
+},
+
+/* ---------- 4 ---------- */
+"Explorer l'historique":{
+  q:"L'historique n'a d'intérêt que si on sait l'interroger : quand une ligne a-t-elle changé, qui l'a écrite, quel commit a introduit un bug. Ces commandes sont en lecture seule : aucune ne peut abîmer quoi que ce soit.",
+  ex:`git log --oneline --graph --decorate --all   # l'arbre complet
+git log -S "ST_Buffer" --oneline            # quel commit a touché ce code ?
+git show a3f5c9e                            # que faisait ce commit ?
+git blame -L 40,60 traitement.py            # qui a écrit ces lignes ?`,
+  p:"git log ouvre un pager : q pour sortir, / pour chercher, flèches pour naviguer. Beaucoup de débutants croient le terminal bloqué.",
+  doc:[[GD+'log','git log'],[GD+'blame','git blame'],PROGIT]
+},
+"git log":{
+  q:"Le journal des commits, avec des dizaines de filtres. Trois options couvrent presque tous les besoins : --oneline pour la lisibilité, --graph pour les branches, -S pour chercher dans le code lui-même.",
+  ex:`git log --oneline -10
+git log --author="Issa" --since="1 month ago"
+git log --oneline -- scripts/import.py      # l'histoire d'un fichier
+git log -S "EPSG:2953" --oneline            # quand ce texte est-il apparu ?`,
+  p:"--grep cherche dans les MESSAGES de commit, -S cherche dans le CONTENU des fichiers. C'est presque toujours -S que l'on veut pour retrouver l'origine d'une ligne de code."
+},
+"Inspecter un commit":{
+  q:"Voir ce qu'un commit précis a changé, ou récupérer la version d'un fichier telle qu'elle était à ce moment-là, sans toucher à l'état courant.",
+  ex:`git show a3f5c9e                          # message + diff
+git show a3f5c9e:scripts/import.py       # le fichier à cette époque
+git show a3f5c9e:scripts/import.py > ancien.py   # l'extraire
+
+git diff main..feature/export            # ce qui sépare deux branches`,
+  p:"Les sept premiers caractères de l'empreinte suffisent presque toujours : a3f5c9e plutôt que les quarante caractères complets."
+},
+"Qui a écrit quoi":{
+  q:"blame affiche, pour chaque ligne, le dernier commit qui l'a modifiée. L'usage n'est pas de chercher un coupable mais un contexte : trouver le commit, lire son message, comprendre pourquoi la ligne est là.",
+  ex:`git blame -L 40,60 traitement.py
+# a3f5c9e (Issa 2026-03-11 42) seuil = 250   ← puis :
+git show a3f5c9e                          # le message explique le pourquoi`,
+  p:"Un simple reformatage du fichier fait apparaître son auteur sur toutes les lignes. git blame -w -C ignore les changements d'espaces et suit le code déplacé."
+},
+"Trouver un commit fautif":{
+  q:"bisect fait une recherche dichotomique dans l'historique : vous indiquez un commit sain et un commit cassé, Git propose des versions intermédiaires à tester. Sur mille commits, dix tests suffisent.",
+  ex:`git bisect start
+git bisect bad                 # la version actuelle est cassée
+git bisect good v1.2.0         # celle-ci fonctionnait
+# Git bascule le dépôt sur un commit intermédiaire : on teste, puis
+git bisect good      # ou : git bisect bad
+# … jusqu'à « a3f5c9e is the first bad commit »
+git bisect reset               # retour à l'état de départ`,
+  p:"N'oubliez jamais git bisect reset à la fin : sinon vous restez sur un commit intermédiaire, en HEAD détachée, et le travail suivant part au mauvais endroit.",
+  see:["« HEAD détachée »"]
+},
+
+/* ---------- 5 ---------- */
+"Branches":{
+  q:"Une branche isole un travail en cours du code stable. Comme ce n'est qu'un pointeur, en créer une coûte quelques millisecondes : la bonne pratique est d'en créer une par sujet, même pour une correction de trois lignes.",
+  ex:`git switch -c fix/projection-parcelles   # créer et s'y placer
+# … modifications, commits …
+git switch main
+git merge fix/projection-parcelles
+git branch -d fix/projection-parcelles   # ménage`,
+  p:"Une branche qui vit trois semaines accumule les divergences et sa fusion devient un cauchemar de conflits. Court et fréquent vaut mieux que long et parfait.",
+  doc:[[GD+'branch','git branch'],[GD+'switch','git switch'],LGB],
+  see:["Merge","Pull request"]
+},
+"Créer & naviguer":{
+  q:"switch remplace avantageusement checkout depuis Git 2.23 : il ne fait qu'une chose, changer de branche, là où checkout en faisait cinq. Les deux coexistent, switch est plus sûr.",
+  ex:`git switch -c feature/export-csv    # crée + bascule
+git switch main                     # revient
+git switch -                        # bascule sur la précédente
+git switch -c hotfix main           # part de main, pas de la branche courante`,
+  p:"git switch -c nouvelle emporte avec vous les modifications non committées. C'est souvent pratique, parfois surprenant : si vous vouliez les laisser, faites un stash avant."
+},
+"Supprimer":{
+  q:"Nettoyer les branches terminées, en local et sur GitHub. Le -d minuscule est un garde-fou : il refuse de supprimer une branche dont le travail n'est pas fusionné.",
+  ex:`git branch --merged            # celles qu'on peut supprimer sans risque
+git branch -d feature/x
+git push origin --delete feature/x
+git fetch --prune              # nettoie les références locales obsolètes`,
+  p:"Même après un git branch -D, les commits restent récupérables via le reflog pendant environ 90 jours. Une suppression de branche n'est presque jamais définitive.",
+  see:["reflog — le filet de sécurité"]
+},
+"Nommer & organiser":{
+  q:"Une convention de nommage rend l'état d'un projet lisible d'un coup d'œil. GitHub Flow — une branche courte par sujet, fusionnée par pull request — suffit à la très grande majorité des équipes.",
+  ex:`main                          # toujours fonctionnelle, déployable
+feature/export-geojson        # nouvelle fonctionnalité
+fix/calcul-surface            # correction
+docs/guide-installation       # documentation
+hotfix/plantage-import        # urgence en production`,
+  p:"Git Flow (develop, release, hotfix…) est souvent adopté par mimétisme alors qu'il vise des logiciels livrés en versions numérotées. Pour un projet livré en continu, il ajoute surtout de la cérémonie."
+},
+
+/* ---------- 6 ---------- */
+"Fusionner, rebaser, conflits":{
+  q:"Deux façons de rapatrier le travail d'une branche. Le merge conserve l'histoire telle qu'elle s'est produite, avec ses embranchements. Le rebase la réécrit pour la rendre linéaire, comme si tout avait été fait à la suite. Aucune n'est meilleure : c'est un choix d'équipe.",
+  ex:`# merge : la branche apparaît dans l'historique
+git switch main
+git merge feature/export
+
+# rebase : mes commits sont rejoués sur main à jour
+git switch feature/export
+git rebase main
+git switch main
+git merge feature/export      # simple avance rapide`,
+  p:"La règle d'or : on ne rebase JAMAIS une branche que d'autres ont déjà récupérée. Le rebase remplace les commits par de nouveaux, et le dépôt des collègues devient incohérent.",
+  doc:[[GD+'merge','git merge'],[GD+'rebase','git rebase'],LGB]
+},
+"Merge":{
+  q:"Fusionner une branche dans une autre. On se place toujours SUR la branche qui reçoit, puis on nomme celle qui apporte.",
+  ex:`git switch main
+git pull                       # main à jour avant de fusionner
+git merge feature/export
+
+# en cas de problème, à tout moment :
+git merge --abort`,
+  p:"Sens de la commande : « git merge feature » depuis main intègre feature dans main. Beaucoup se trompent de branche de départ et intègrent main dans leur branche — ce qui n'est pas une erreur, mais pas ce qui était voulu."
+},
+"Rebase":{
+  q:"Rejouer ses commits par-dessus une base plus récente, pour obtenir un historique linéaire. Le rebase interactif (-i) permet en plus de nettoyer ses commits avant de les proposer : fusionner les « oups », reformuler les messages.",
+  ex:`# nettoyer les 3 derniers commits avant d'ouvrir une pull request
+git rebase -i HEAD~3
+# dans l'éditeur :
+#   pick   a3f5c9e feat: ajoute l'export
+#   squash b7d2f10 oups typo          ← fusionné dans le précédent
+#   reword c1e4a55 corrige le format  ← message réécrit`,
+  p:"Un rebase peut demander de résoudre le même conflit plusieurs fois, une fois par commit rejoué. Si cela arrive, git rebase --abort et un merge classique sont souvent plus raisonnables.",
+  see:["Conflits"]
+},
+"Conflits":{
+  q:"Un conflit survient quand deux branches modifient les mêmes lignes. Git ne peut pas choisir : il insère les deux versions dans le fichier et vous laisse trancher. Ce n'est pas une panne, c'est une question posée.",
+  ex:`git merge feature/export
+# CONFLICT (content): Merge conflict in traitement.py
+
+# ouvrir le fichier : garder ce qu'il faut, effacer les marqueurs
+# <<<<<<< HEAD          ← ma version
+# =======
+# >>>>>>> feature/export ← la version entrante
+
+git add traitement.py          # marquer comme résolu
+git commit                     # conclure la fusion
+
+git merge --abort              # ou : tout annuler et recommencer`,
+  p:"Les marqueurs <<<<<<< ======= >>>>>>> doivent DISPARAÎTRE du fichier. Committés par erreur, ils cassent le code — et cela arrive plus souvent qu'on ne croit."
+},
+"Récupérer un commit précis":{
+  q:"cherry-pick applique un commit isolé sur la branche courante. Utile pour porter une correction urgente de develop vers main sans emmener le reste.",
+  ex:`git switch main
+git cherry-pick a3f5c9e        # la correction seule
+git push`,
+  p:"Le commit récupéré reçoit une nouvelle empreinte : ce n'est pas le même objet. Si la branche d'origine est fusionnée plus tard, le même changement peut apparaître deux fois dans l'historique."
+},
+
+/* ---------- 7 ---------- */
+"Annuler & réparer":{
+  q:"Presque tout se rattrape dans Git — à condition de choisir la bonne commande. La question à se poser d'abord : le travail est-il déjà poussé ? Si oui, on annule avec revert, qui ajoute à l'histoire. Si non, on peut réécrire librement avec reset ou amend.",
+  ex:`# non poussé : je réécris
+git commit --amend            # corriger le dernier commit
+git reset --soft HEAD~1       # défaire le commit, garder le travail
+
+# déjà poussé : j'ajoute une annulation
+git revert a3f5c9e
+
+# je me suis trompé de commande : reflog
+git reflog
+git reset --hard HEAD@{2}`,
+  p:"reset --hard est la seule commande de Git qui détruit vraiment du travail non committé. Avant de la lancer, demandez-vous si un stash ne ferait pas l'affaire.",
+  doc:[[GD+'reset','git reset'],[GD+'revert','git revert'],[GD+'reflog','git reflog'],LGB],
+  see:["reflog — le filet de sécurité"]
+},
+"Choisir la bonne commande":{
+  q:"Cinq commandes, cinq situations. Les confondre est la principale source d'accidents : reset recule la branche, revert ajoute un commit inverse.",
+  ex:`# Modifications non committées ......... git restore
+# Dernier commit à corriger (local) ..... git commit --amend
+# Reculer la branche (local) ............ git reset
+# Annuler un commit déjà poussé ......... git revert
+# « J'ai tout cassé » ................... git reflog`,
+  p:"Sur une branche partagée, reset suivi d'un push --force efface le travail des autres. C'est la raison d'être de revert : annuler sans réécrire."
+},
+"reset — les trois modes":{
+  q:"reset déplace le pointeur de branche en arrière. Ce qui change entre les trois modes, c'est le sort réservé à vos fichiers : --soft garde tout indexé, --mixed garde les fichiers modifiés, --hard efface.",
+  ex:`# refaire proprement les 3 derniers commits, sans rien perdre
+git reset --soft HEAD~3
+git status                     # tout est là, indexé
+git commit -m "feat: ajoute l'export complet"
+
+# tout jeter et repartir de l'état distant
+git fetch origin
+git reset --hard origin/main   # ⚠ le travail local disparaît`,
+  p:"--hard est la seule des trois qui détruit. --soft et --mixed sont sans danger : ils ne touchent qu'aux commits, pas au contenu des fichiers."
+},
+"revert — annuler proprement":{
+  q:"revert crée un commit qui applique l'inverse d'un commit passé. L'historique reste intact et cohérent pour tout le monde : c'est LA façon d'annuler quelque chose de déjà publié.",
+  ex:`git revert a3f5c9e             # crée « Revert "…" »
+git push
+
+# annuler une fusion : -m 1 = garder la branche principale
+git revert -m 1 <sha-du-merge>`,
+  p:"revert n'efface pas le commit d'origine : les deux restent visibles dans l'historique. C'est voulu — l'histoire n'est pas censée mentir."
+},
+"reflog — le filet de sécurité":{
+  q:"Le reflog enregistre chaque déplacement de HEAD : commits, changements de branche, reset, rebase. Même ce qui a disparu de l'historique y figure. C'est la commande qui rend Git quasiment increvable.",
+  ex:`git reset --hard HEAD~3        # « j'ai perdu 3 commits »
+
+git reflog
+# a3f5c9e HEAD@{0}: reset: moving to HEAD~3
+# b7d2f10 HEAD@{1}: commit: feat: export CSV   ← le voilà
+
+git reset --hard HEAD@{1}      # tout revient`,
+  p:"Le reflog est LOCAL et purgé après environ 90 jours. Il ne protège que ce qui a été committé au moins une fois — jamais le travail resté dans l'éditeur."
+},
+"Nettoyer":{
+  q:"Supprimer les fichiers non suivis qui encombrent le dossier, ou retirer un fichier du suivi Git. clean est irréversible : Git n'a jamais connu ces fichiers, il ne peut pas les rendre.",
+  ex:`git clean -n                   # SIMULATION, toujours en premier
+git clean -fd                  # supprime fichiers et dossiers non suivis
+
+git rm --cached .env           # retire du suivi, garde le fichier
+echo ".env" >> .gitignore
+git commit -m "Retire .env du suivi"`,
+  p:"git clean -fdx supprime aussi ce qui est ignoré : .venv, node_modules, et surtout votre .env local avec ses identifiants. Le x est le caractère le plus coûteux de Git."
+},
+
+/* ---------- 8 ---------- */
+"Mettre de côté":{
+  q:"Il faut basculer d'urgence sur une autre branche mais le travail en cours n'est pas committable. stash le range dans une pile et rend le dossier propre ; worktree ouvre une seconde copie du dépôt sans rien déranger.",
+  ex:`git stash push -m "export csv en cours"
+git switch hotfix
+# … correction urgente, commit, push …
+git switch feature/export
+git stash pop                  # le travail revient`,
+  p:"Un stash oublié depuis deux mois est du travail perdu en pratique : personne ne se souvient de ce qu'il contient. Nommez-les, et videz la pile régulièrement.",
+  doc:[[GD+'stash','git stash'],[GD+'worktree','git worktree']]
+},
+"git stash":{
+  q:"Une pile où ranger temporairement des modifications. Le dossier redevient propre, on fait autre chose, puis on récupère.",
+  ex:`git stash push -m "wip export"     # ranger
+git stash list                      # stash@{0}: On feature: wip export
+git stash show -p stash@{0}         # voir avant d'appliquer
+git stash pop                       # récupérer et retirer de la pile
+git stash apply stash@{1}           # récupérer sans retirer`,
+  p:"git stash ignore par défaut les fichiers non suivis : un nouveau fichier reste dans le dossier et vous suit d'une branche à l'autre. Utilisez git stash -u pour l'emporter aussi."
+},
+"Plusieurs dossiers de travail":{
+  q:"worktree crée un second dossier lié au même dépôt, positionné sur une autre branche. Deux branches ouvertes en parallèle, deux fenêtres d'éditeur, aucun stash à gérer.",
+  ex:`git worktree add ../projet-hotfix hotfix
+cd ../projet-hotfix            # dossier séparé, branche hotfix
+# … correction, commit, push …
+cd ../projet
+git worktree remove ../projet-hotfix`,
+  p:"Une même branche ne peut pas être ouverte dans deux worktrees simultanément — Git refuse, et c'est une protection."
+},
+
+/* ---------- 9 ---------- */
+"Dépôts distants":{
+  q:"Le distant (origin) est la copie partagée, en général sur GitHub. Trois verbes : fetch télécharge sans rien changer chez vous, pull télécharge et intègre, push envoie. Le réflexe qui évite les ennuis : fetch puis regarder, avant d'intégrer.",
+  ex:`git fetch origin
+git log HEAD..origin/main --oneline   # ce qui est arrivé sans moi
+git pull --rebase                     # j'intègre proprement
+git push`,
+  p:"git pull est un fetch suivi d'une fusion automatique. Sur une branche qui a divergé, il crée des commits de fusion en cascade dans l'historique. --rebase donne un résultat bien plus lisible.",
+  doc:[[GD+'fetch','git fetch'],[GD+'push','git push'],PROGIT]
+},
+"Configurer les distants":{
+  q:"Déclarer où se trouve le dépôt partagé. origin par convention ; upstream quand vous travaillez sur un fork et voulez suivre le dépôt d'origine.",
+  ex:`git remote -v
+git remote set-url origin git@github.com:moi/projet.git   # HTTPS → SSH
+git remote add upstream https://github.com/org/projet.git
+git remote show origin`,
+  p:"Basculer de HTTPS vers SSH règle définitivement les demandes répétées d'identifiants — à condition d'avoir déposé sa clé publique sur GitHub.",
+  see:["Clé SSH"]
+},
+"Récupérer":{
+  q:"fetch met à jour votre connaissance du distant sans toucher à votre travail : c'est une opération sans aucun risque. pull fait la même chose puis intègre immédiatement.",
+  ex:`git fetch --all --prune
+git status                     # « votre branche est en retard de 3 commits »
+git diff main origin/main      # ce que ces 3 commits changent
+git pull --rebase              # intégration en connaissance de cause`,
+  p:"Un pull lancé avec des modifications non committées peut échouer en plein milieu et laisser le dépôt dans un état intermédiaire. Committez ou stashez d'abord."
+},
+"Envoyer":{
+  q:"Publier ses commits. La première fois pour une branche, -u crée la branche distante et l'associe ; ensuite git push seul suffit.",
+  ex:`git push -u origin feature/export     # première fois
+git push                              # ensuite
+
+# après un rebase de MA branche uniquement
+git push --force-with-lease`,
+  p:"--force-with-lease refuse d'écraser si quelqu'un a poussé entretemps ; --force écrase sans poser de question. Prenez l'habitude du premier, toujours."
+},
+"Branches de suivi":{
+  q:"origin/main n'est pas la branche distante : c'est votre dernière photo de son état, prise au dernier fetch. Comprendre cela explique les messages « ahead / behind » de git status.",
+  ex:`git branch -vv
+# * main  a3f5c9e [origin/main: ahead 2, behind 3] …
+#   → j'ai 2 commits qu'ils n'ont pas, ils en ont 3 que je n'ai pas
+
+git fetch                      # rafraîchit origin/main
+git pull --rebase              # réconcilie les deux`,
+  p:"« behind 3 » affiché depuis une semaine ne veut rien dire : sans fetch, l'information date de votre dernière synchronisation. Faites un fetch avant de vous fier au compteur."
+},
+
+/* ---------- 10 ---------- */
+"Étiquettes & versions":{
+  q:"Une étiquette marque un commit de façon permanente — typiquement une version livrée. Contrairement à une branche, elle ne bouge jamais : v1.2.0 désignera toujours exactement le même code.",
+  ex:`git tag -a v1.2.0 -m "Version 1.2.0 — export GeoJSON"
+git push origin v1.2.0
+gh release create v1.2.0 --generate-notes    # release GitHub associée`,
+  p:"git push n'envoie pas les étiquettes. Sans git push origin v1.2.0 (ou --tags), la version n'existe que sur votre poste et aucune release GitHub ne peut s'y rattacher.",
+  doc:[[GD+'tag','git tag'],['https://semver.org/lang/fr/','Versionnage sémantique (français)']]
+},
+"Poser une étiquette":{
+  q:"Deux formes : annotée (-a), qui est un véritable objet Git daté et signable, et légère, simple marqueur. Pour une version publiée, toujours annotée.",
+  ex:`git tag -a v1.2.0 -m "Version 1.2.0"
+git tag -a v1.1.0 a3f5c9e -m "Version 1.1.0"   # étiqueter après coup
+git push --tags
+git describe --tags                            # v1.2.0-3-ga3f5c9e`,
+  p:"Corriger une étiquette déjà poussée oblige à la supprimer des deux côtés puis à la recréer : ceux qui l'ont récupérée garderont l'ancienne. Une étiquette se pose une fois, correctement."
+},
+"Numéroter (SemVer)":{
+  q:"Le versionnage sémantique donne un sens au numéro : en lisant 2.4.1 → 3.0.0, on sait que quelque chose va casser. C'est une convention, pas une règle Git — mais elle est comprise partout.",
+  ex:`1.0.0 → 1.0.1   correction de bug, aucun risque
+1.0.1 → 1.1.0   nouveauté, compatible
+1.1.0 → 2.0.0   incompatible : il faudra adapter le code appelant`,
+  p:"Tant qu'un projet est en 0.x.y, tout peut changer à chaque version : c'est la convention pour signaler qu'une API n'est pas encore stabilisée."
+},
+
+/* ---------- 11 ---------- */
+"GitHub — collaborer":{
+  q:"La pull request est le cœur de GitHub : elle propose de fusionner une branche, ouvre un espace de discussion ligne par ligne, et déclenche les vérifications automatiques. C'est à la fois un mécanisme technique et un rituel de relecture.",
+  ex:`git switch -c fix/projection
+# … commits …
+git push -u origin fix/projection
+gh pr create --fill --assignee @me
+
+# relecture demandée, puis :
+gh pr merge --squash --delete-branch`,
+  p:"Une PR de 2 000 lignes reçoit un « LGTM » en trois minutes ; une PR de 200 lignes reçoit de vrais commentaires. Découper est le meilleur moyen d'obtenir une relecture utile.",
+  doc:[[GH+'pull-requests','Pull requests — documentation GitHub (fr)'],['https://cli.github.com/manual/','Manuel GitHub CLI']]
+},
+"Fork & contribution externe":{
+  q:"Le fork sert à contribuer à un dépôt dont vous n'êtes pas membre : vous travaillez dans votre copie et proposez ensuite vos commits par pull request. Au sein d'une même organisation, on utilise plutôt des branches.",
+  ex:`gh repo fork org/projet --clone
+cd projet
+git remote -v          # origin = mon fork, upstream = le dépôt d'origine
+
+git fetch upstream
+git switch -c fix/typo upstream/main
+# … commits …
+git push -u origin fix/typo
+gh pr create --repo org/projet --fill`,
+  p:"Un fork ne se met pas à jour tout seul. Avant chaque nouvelle contribution : git fetch upstream et repartir de upstream/main, sinon la PR embarque des commits déjà fusionnés."
+},
+"Pull request":{
+  q:"Proposer l'intégration d'une branche. Une bonne PR se lit sans ouvrir le code : titre explicite, description du problème, de la solution, et de la façon de tester.",
+  ex:`gh pr create --title "fix: corrige la projection des parcelles" --body "
+## Problème
+Les parcelles importées apparaissaient décalées de ~200 m.
+
+## Solution
+Reprojection systématique de 2036 vers 2953 à l'import.
+
+## Test
+python -m pytest tests/test_import.py
+
+Closes #17"`,
+  p:"« Closes #17 », « Fixes #17 » ou « Resolves #17 » dans la description ferment l'issue automatiquement à la fusion. Dans un commentaire ajouté après coup, cela ne fonctionne pas.",
+  doc:[[GH+'pull-requests','Documentation GitHub (fr)']]
+},
+"Relire (review)":{
+  q:"Relire, c'est comprendre l'intention avant de commenter la forme. Les suggestions de modification permettent de proposer un correctif que l'auteur applique en un clic.",
+  ex:`gh pr checkout 12              # récupérer la PR en local pour la tester
+# … essais …
+gh pr review 12 --approve -b "Testé sur le jeu de données de mars, RAS"
+
+# ou, dans l'interface, sur une ligne précise :
+# \`\`\`suggestion
+# seuil = 250
+# \`\`\``,
+  p:"« Request changes » bloque la fusion tant que vous n'avez pas ré-approuvé. Si vous partez en congé après l'avoir posé, la PR reste coincée : préférez « Comment » pour une remarque non bloquante."
+},
+"Fusionner une PR":{
+  q:"Trois stratégies, trois formes d'historique. Squash est le choix le plus courant : une PR devient un commit unique sur main, ce qui rend l'historique lisible et le revert trivial.",
+  ex:`gh pr merge 12 --squash --delete-branch
+
+# après la fusion, côté local :
+git switch main
+git pull
+git branch -d fix/projection`,
+  p:"Après un « Squash and merge », la branche fusionnée a des commits qui n'existent plus sous cette forme sur main. Ne la réutilisez pas : supprimez-la et repartez d'un main à jour."
+},
+"Issues & organisation":{
+  q:"Les issues sont la liste de tâches et le suivi de bugs du projet. Bien utilisées, elles remplacent les courriels et gardent la décision à côté du code.",
+  ex:`gh issue create --title "L'import échoue sur les fichiers > 500 Mo" \\
+  --body "Étapes pour reproduire… Comportement attendu…" --label bug
+
+gh issue list --assignee @me --state open
+gh issue close 17 --comment "Corrigé dans #23"`,
+  p:"Une issue sans étapes de reproduction ni comportement attendu coûte deux allers-retours avant même de commencer. Un modèle d'issue (.github/ISSUE_TEMPLATE) impose ces champs.",
+  doc:[[GH+'issues','Issues — documentation GitHub (fr)']]
+},
+
+/* ---------- 12 ---------- */
+"GitHub — documenter & publier":{
+  q:"Un dépôt sans README est un dépôt inutilisable par autrui — et par vous-même dans six mois. GitHub met en valeur automatiquement quatre éléments : le README, la licence, les releases et, si vous le voulez, un site web publié depuis le dépôt.",
+  ex:`# Analyse des parcelles
+
+Chaîne de traitement pour croiser le cadastre et les zones inondables.
+
+## Installation
+\`\`\`bash
+python -m venv .venv && .venv\\Scripts\\activate
+pip install -r requirements.txt
+\`\`\`
+
+## Utilisation
+\`\`\`bash
+python import.py --source data/parcelles.gpkg --srid 2953
+\`\`\`
+
+## Licence
+MIT`,
+  p:"Le README doit répondre à trois questions dans les dix premières lignes : à quoi ça sert, comment l'installer, comment l'utiliser. Le reste peut attendre.",
+  doc:[[GH+'repositories','Dépôts — documentation GitHub (fr)'],['https://www.markdownguide.org/basic-syntax/','Aide-mémoire Markdown']]
+},
+"README":{
+  q:"La page d'accueil du dépôt, écrite en Markdown. GitHub l'affiche automatiquement, y compris dans chaque sous-dossier qui en contient un.",
+  ex:`# Titre
+## Sous-titre
+**gras**  ·  *italique*  ·  \`code\`
+- liste à puces
+- [ ] case à cocher
+[lien](https://exemple.ca)
+![image](chemin/image.png)
+
+| Colonne | Colonne |
+|---------|---------|
+| valeur  | valeur  |`,
+  p:"Les chemins d'images relatifs fonctionnent sur GitHub mais cassent si le README est affiché ailleurs (PyPI, site généré). Pour un projet publié, utilisez des URL complètes."
+},
+"Licence & gouvernance":{
+  q:"La licence définit ce que les autres peuvent faire de votre travail. Sans elle, le droit d'auteur s'applique par défaut : personne ne peut légalement réutiliser le code, même public.",
+  ex:`MIT          → réutilisation libre, y compris commerciale, avec attribution
+Apache-2.0   → idem + protection sur les brevets
+GPL-3.0      → les travaux dérivés doivent rester libres
+CC-BY-4.0    → pour de la donnée ou de la documentation`,
+  p:"Pour du contenu produit dans un cadre professionnel ou public, la licence n'est pas votre décision seule : vérifiez auprès de votre organisation avant de publier."
+},
+"Releases":{
+  q:"Une release est une étiquette Git enrichie : notes de version, fichiers téléchargeables, date. C'est ce que les utilisateurs consultent pour savoir quoi installer.",
+  ex:`git tag -a v1.2.0 -m "Version 1.2.0"
+git push origin v1.2.0
+gh release create v1.2.0 --generate-notes ./dist/outil.zip`,
+  p:"--generate-notes construit les notes à partir des titres de pull requests fusionnées depuis la version précédente. C'est un argument de plus pour soigner les titres de PR."
+},
+"GitHub Pages":{
+  q:"Publier un site statique directement depuis le dépôt, gratuitement : documentation, portfolio, démonstration, carte web légère.",
+  ex:`# Settings → Pages → Source : Deploy from a branch
+#   Branch : main   Folder : /docs
+
+mkdir docs
+echo "<h1>Documentation</h1>" > docs/index.html
+git add docs && git commit -m "Ajoute le site" && git push
+# → https://moi.github.io/projet/`,
+  p:"La publication prend une à deux minutes après le push, et le navigateur garde longtemps l'ancienne version en cache. Testez en navigation privée avant de conclure à une panne."
+},
+"Rendre le dépôt trouvable":{
+  q:"Description, topics et README de profil déterminent si votre travail est retrouvé — par les autres, et par vous quand vos dépôts se comptent en dizaines.",
+  ex:`# Sur la page du dépôt → ⚙ à droite de « About »
+Description : Chaîne de traitement cadastre / zones inondables (PostGIS)
+Topics      : postgis, python, gis, cadastre, new-brunswick`,
+  p:"Un dépôt privé rendu public conserve tout son historique : les secrets committés il y a deux ans deviennent visibles. Faites l'audit AVANT de basculer la visibilité.",
+  see:["Secrets & analyse"]
+},
+
+/* ---------- 13 ---------- */
+"GitHub Actions":{
+  q:"Actions exécute automatiquement des tâches à chaque push, pull request ou horaire : lancer les tests, vérifier le style, construire une image, publier une release. Un fichier YAML dans .github/workflows suffit.",
+  ex:`# .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: pytest -q`,
+  p:"Le YAML est sensible à l'indentation : deux espaces, jamais de tabulation. La grande majorité des workflows qui « ne se déclenchent pas » ont en réalité une erreur de syntaxe — visible dans l'onglet Actions.",
+  doc:[[GH+'actions','GitHub Actions — documentation (fr)'],['https://github.com/marketplace?type=actions','Marketplace des actions']]
+},
+"Structure d'un workflow":{
+  q:"Trois niveaux emboîtés : le workflow (le fichier), les jobs (exécutés en parallèle par défaut, chacun sur une machine neuve), les steps (séquentiels dans un job).",
+  ex:`name: CI
+on: [push]
+jobs:
+  lint:                    # ces deux jobs tournent EN PARALLÈLE
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ruff check .
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pytest`,
+  p:"Chaque job démarre sur une machine vierge : rien ne se transmet d'un job à l'autre, pas même les fichiers. Pour partager, il faut needs: et les artefacts (actions/upload-artifact)."
+},
+"Déclencheurs":{
+  q:"Quand le workflow s'exécute. pull_request est le plus utile : il valide le code avant la fusion, ce qui permet ensuite d'exiger une CI verte pour fusionner.",
+  ex:`on:
+  pull_request:
+  push:
+    branches: [main]
+    paths: ['src/**', 'tests/**']
+  schedule:
+    - cron: '0 6 * * 1'      # lundi 6 h UTC
+  workflow_dispatch:          # bouton manuel`,
+  p:"Le cron des Actions est en UTC, pas dans votre fuseau, et l'exécution peut être différée de plusieurs minutes en cas de charge. Ne l'utilisez pas pour une tâche à l'heure près."
+},
+"Secrets & variables":{
+  q:"Un secret est une valeur chiffrée, injectée à l'exécution et masquée dans les journaux. C'est le seul endroit correct où mettre un jeton, un mot de passe ou une clé d'API.",
+  ex:`# Settings → Secrets and variables → Actions → New repository secret
+
+steps:
+  - run: ./deploy.sh
+    env:
+      API_KEY: \${{ secrets.API_KEY }}
+
+permissions:
+  contents: read              # moindre privilège pour GITHUB_TOKEN`,
+  p:"Les secrets ne sont PAS transmis aux workflows déclenchés par une pull request venant d'un fork — c'est une protection contre l'exfiltration, pas un bug.",
+  see:["Secrets & analyse"]
+},
+"Aller plus loin":{
+  q:"Matrices pour tester plusieurs versions, cache pour accélérer, conditions pour n'exécuter que ce qui est utile. Ces quatre options couvrent presque tous les besoins réels.",
+  ex:`jobs:
+  test:
+    strategy:
+      matrix:
+        python: ['3.10', '3.11', '3.12']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: \${{ matrix.python }}
+          cache: 'pip'
+      - run: pytest`,
+  p:"Une matrice de 3 versions × 3 systèmes fait 9 exécutions à chaque push : sur un dépôt privé, les minutes sont facturées. Réservez les grandes matrices aux exécutions sur main."
+},
+
+/* ---------- 14 ---------- */
+"GitHub CLI & API":{
+  q:"gh apporte GitHub dans le terminal : créer un dépôt, ouvrir une pull request, suivre une exécution de workflow, sans quitter la ligne de commande. Il gère aussi l'authentification, ce qui règle la question des jetons.",
+  ex:`gh auth login                       # une fois
+gh repo create analyse --private --source=. --push
+gh pr create --fill
+gh pr checkout 12                   # tester la PR d'un collègue
+gh run watch                        # suivre la CI en direct`,
+  p:"gh auth login remplace la gestion manuelle des Personal Access Tokens et configure aussi Git : c'est la façon la plus simple de régler définitivement les demandes d'identifiants.",
+  doc:[['https://cli.github.com/manual/','Manuel GitHub CLI'],['https://docs.github.com/rest','API REST GitHub']]
+},
+"Démarrer avec gh":{
+  q:"Installation, authentification, et la commande qui fait gagner le plus de temps : créer le dépôt distant depuis un dossier local déjà initialisé.",
+  ex:`winget install --id GitHub.cli     # Windows
+gh auth login                      # navigateur → terminal authentifié
+gh auth status
+
+cd mon-projet
+gh repo create mon-projet --private --source=. --push`,
+  p:"--source=. suppose que le dossier est déjà un dépôt Git avec au moins un commit. Sinon, git init et un premier commit d'abord."
+},
+"Commandes du quotidien":{
+  q:"Les cinq commandes gh qui reviennent tous les jours. gh pr checkout est la plus sous-estimée : elle récupère la branche d'une PR en une commande, pour la tester réellement au lieu de la lire.",
+  ex:`gh pr create --fill
+gh pr checkout 12
+gh pr status
+gh run watch                # suit l'exécution en cours
+gh browse                   # ouvre la page GitHub du fichier courant`,
+  p:"gh pr checkout crée une branche locale liée à la PR. Pensez à revenir sur main et à la supprimer après, sinon les branches de relecture s'accumulent."
+},
+"API":{
+  q:"gh api adresse l'API REST de GitHub avec votre authentification déjà en place, et sait filtrer le JSON. Parfait pour un inventaire ou une automatisation ponctuelle.",
+  ex:`# toutes les issues ouvertes, titres seuls
+gh api repos/org/projet/issues --paginate --jq '.[].title'
+
+# créer une issue depuis un script
+gh api -X POST repos/org/projet/issues \\
+  -f title="Import à revoir" -f body="Voir le journal du 24/07"`,
+  p:"--paginate est indispensable : sans lui, l'API s'arrête à 30 éléments et vous croyez avoir tout récupéré."
+},
+
+/* ---------- 15 ---------- */
+"Sécurité & authentification":{
+  q:"Trois sujets : prouver son identité à GitHub (SSH ou jeton), empêcher les secrets d'entrer dans le dépôt, et protéger la branche principale. Les trois se règlent une fois et servent des années.",
+  ex:`# 1. clé SSH, une fois par poste
+ssh-keygen -t ed25519 -C "moi@exemple.ca"
+cat ~/.ssh/id_ed25519.pub          # → GitHub → Settings → SSH keys
+ssh -T git@github.com
+
+# 2. secrets hors du dépôt
+echo ".env" >> .gitignore
+
+# 3. main protégée : Settings → Branches → Require a pull request`,
+  p:"Un secret poussé sur GitHub doit être considéré comme public dès la seconde suivante : des robots scrutent les dépôts en continu. La révocation est la première mesure, pas le nettoyage de l'historique.",
+  doc:[[GH+'authentication','Authentification — documentation GitHub (fr)'],[GH+'code-security','Sécurité du code (fr)']]
+},
+"Clé SSH":{
+  q:"La clé SSH authentifie votre poste auprès de GitHub sans mot de passe ni jeton à retaper. La clé publique se dépose sur GitHub, la privée ne quitte jamais la machine.",
+  ex:`ssh-keygen -t ed25519 -C "moi@exemple.ca"
+# Enter file… → Entrée (valeur par défaut)
+# Passphrase  → recommandée
+
+cat ~/.ssh/id_ed25519.pub
+# ssh-ed25519 AAAAC3Nza… moi@exemple.ca   ← à copier sur GitHub
+
+ssh -T git@github.com
+# Hi moi! You've successfully authenticated…`,
+  p:"Ne copiez jamais le fichier SANS .pub : c'est la clé privée. Si elle a fuité (courriel, dépôt, capture d'écran), supprimez-la de GitHub et régénérez-en une."
+},
+"Jetons (HTTPS)":{
+  q:"En HTTPS, GitHub n'accepte plus le mot de passe du compte depuis 2021 : il faut un Personal Access Token. Les jetons « fine-grained » permettent de limiter l'accès à un seul dépôt et de fixer une expiration.",
+  ex:`# Settings → Developer settings → Personal access tokens
+#   → Fine-grained tokens → Repository access : un seul dépôt
+#   → Expiration : 90 jours
+# Le jeton s'utilise à la place du mot de passe au premier push
+
+git config --global credential.helper manager   # Windows : mémorisation`,
+  p:"Un jeton sans date d'expiration et avec toutes les portées est aussi dangereux que le mot de passe du compte. Portée minimale, durée courte : le renouvellement prend deux minutes."
+},
+"Protéger la branche principale":{
+  q:"Empêcher le push direct sur main et exiger une relecture plus une CI verte. C'est le réglage qui transforme une bonne intention d'équipe en garantie technique.",
+  ex:`# Settings → Branches (ou Rules → Rulesets) → Add rule, branche : main
+#   ☑ Require a pull request before merging  →  1 approbation
+#   ☑ Require status checks to pass          →  CI
+#   ☑ Do not allow bypassing the above settings`,
+  p:"Sans « Do not allow bypassing », les administrateurs contournent la règle — c'est-à-dire, très souvent, la personne qui pousse le plus vite sous pression."
+},
+"Secrets & analyse":{
+  q:"Empêcher les identifiants d'entrer dans le dépôt, et détecter ceux qui y sont déjà. Un secret dans l'historique reste accessible même si le fichier a été supprimé ensuite.",
+  ex:`# prévention
+echo ".env" >> .gitignore
+cp .env .env.example        # puis vider les valeurs et versionner l'exemple
+
+# détection dans tout l'historique
+gitleaks detect --source . --verbose
+
+# côté GitHub : Settings → Code security
+#   ☑ Secret scanning   ☑ Push protection   ☑ Dependabot alerts`,
+  p:"Push protection bloque un push contenant une clé reconnue (AWS, Google, Stripe…), mais ne reconnaît pas un mot de passe de base de données maison. Le .gitignore reste la première défense.",
+  see:["« J'ai poussé un secret »"]
+},
+"Signer ses commits":{
+  q:"Le nom et le courriel d'un commit sont de simples champs de texte : n'importe qui peut committer sous votre identité. La signature prouve cryptographiquement l'origine, et GitHub affiche alors le badge « Verified ».",
+  ex:`git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
+
+# GitHub → Settings → SSH and GPG keys → New SSH key
+#   Key type : Signing Key   (et non Authentication Key)`,
+  p:"La même clé doit être déposée deux fois sur GitHub si elle sert à la fois à s'authentifier et à signer : une entrée « Authentication Key », une entrée « Signing Key »."
+},
+
+/* ---------- 16 ---------- */
+"Dépannage & urgences":{
+  q:"Les sept situations qui font paniquer, et leur solution en deux ou trois commandes. Le principe général : Git efface très rarement quelque chose pour de bon. Avant toute manœuvre risquée, git status puis git reflog — et surtout, ne pas enchaîner des commandes trouvées au hasard sur un forum.",
+  ex:`# Le triage d'urgence, dans cet ordre
+git status         # où en suis-je exactement ?
+git reflog         # qu'ai-je fait juste avant ?
+git stash          # mettre le travail en cours à l'abri
+# … et seulement ensuite, la commande de réparation`,
+  p:"La règle qui sauve : avant toute commande dont vous n'êtes pas sûr, faites une copie du dossier complet. Cinq secondes de copie contre une heure de récupération.",
+  doc:[['https://dangitgit.com/fr','Dangit, Git!?! — solutions aux pannes courantes, en français'],[GD+'reflog','git reflog']]
+},
+"« J'ai commité au mauvais endroit »":{
+  q:"Vous avez committé sur main au lieu de votre branche. Le commit n'est pas perdu : il suffit de le déplacer. Deux cas selon qu'il est déjà poussé ou non.",
+  ex:`# non poussé : on défait et on recommitte au bon endroit
+git reset --soft HEAD~1        # le commit disparaît, le travail reste indexé
+git switch -c la-bonne-branche
+git commit -m "feat: ajoute l'export"
+
+# déjà poussé : on récupère le commit ailleurs, puis on annule sur main
+git switch la-bonne-branche
+git cherry-pick a3f5c9e
+git switch main
+git revert a3f5c9e`,
+  p:"Sur main déjà poussée, ne faites pas reset + push --force : vous effaceriez le travail des autres. C'est exactement le cas d'usage de revert."
+},
+"« J'ai perdu du travail »":{
+  q:"Après un reset --hard, un rebase raté ou une branche supprimée. Tant que le travail a été committé au moins une fois, il est presque certainement récupérable.",
+  ex:`git reflog
+# b7d2f10 HEAD@{1}: commit: feat: export CSV    ← le commit « perdu »
+
+git switch -c sauvetage b7d2f10    # on le récupère dans une branche
+# ou, pour revenir en place :
+git reset --hard HEAD@{1}`,
+  p:"Un travail jamais committé n'apparaît nulle part : ni reflog, ni fsck. C'est le seul cas réellement irrécupérable — et l'argument le plus solide pour committer souvent."
+},
+"« HEAD détachée »":{
+  q:"Vous n'êtes sur aucune branche : HEAD pointe directement sur un commit. Cela arrive après un checkout d'étiquette ou de commit, ou pendant un bisect. Les commits faits dans cet état ne sont rattachés à rien.",
+  ex:`git status
+# HEAD detached at a3f5c9e
+
+# rien de fait ici → revenir simplement
+git switch -
+
+# du travail a été committé ici → le sauver d'abord
+git switch -c ma-branche-de-sauvetage`,
+  p:"Quitter une HEAD détachée avec git switch main SANS créer de branche abandonne les commits qui y ont été faits. Ils restent dans le reflog, mais plus rien ne les référence."
+},
+"« Le push est refusé »":{
+  q:"Trois causes possibles : le distant a avancé sans vous, la branche est protégée, ou l'authentification échoue. Le message d'erreur les distingue clairement.",
+  ex:`# ! [rejected] main -> main (fetch first)
+git pull --rebase && git push
+
+# ! [remote rejected] (protected branch hook declined)
+git switch -c ma-branche && git push -u origin ma-branche   # puis une PR
+
+# Permission denied (publickey)
+ssh -T git@github.com          # diagnostiquer la clé SSH`,
+  p:"Face à « rejected », la tentation est de forcer. Sur une branche partagée, --force détruit le travail des autres : commencez toujours par pull --rebase.",
+  see:["Envoyer"]
+},
+"« J'ai poussé un secret »":{
+  q:"Un mot de passe, une clé d'API ou un fichier .env vient de partir sur GitHub. L'ordre des opérations compte plus que la vitesse : révoquer d'abord, nettoyer ensuite.",
+  ex:`# 1. RÉVOQUER la clé chez le fournisseur — immédiatement, avant tout
+# 2. retirer le fichier du suivi
+git rm --cached .env
+echo ".env" >> .gitignore
+git commit -m "Retire .env du suivi"
+
+# 3. effacer de tout l'historique (outil externe)
+pip install git-filter-repo
+git filter-repo --path .env --invert-paths
+
+# 4. réécrire le distant, puis prévenir l'équipe (chacun re-clone)
+git push --force-with-lease --all`,
+  p:"Nettoyer l'historique ne suffit jamais : le secret a pu être cloné, indexé ou mis en cache par GitHub. Seule la révocation le rend inoffensif.",
+  see:["Secrets & analyse"]
+},
+"Gros fichiers":{
+  q:"GitHub refuse les fichiers de plus de 100 Mo et avertit dès 50 Mo. Pour des données volumineuses, deux options : Git LFS, ou — souvent préférable — ne pas les versionner du tout.",
+  ex:`git lfs install
+git lfs track "*.tif"
+git add .gitattributes
+git add mnt.tif && git commit -m "Ajoute le MNT via LFS"
+
+git count-objects -vH        # poids réel du dépôt`,
+  p:"Un gros fichier retiré par git rm reste dans l'historique et continue de peser sur chaque clone. Le supprimer vraiment impose de réécrire l'historique avec git filter-repo."
+},
+"Sous-modules":{
+  q:"Un sous-module inclut un autre dépôt Git dans le vôtre, à un commit précis. Puissant, mais source constante de confusion : à n'utiliser que si une dépendance ne peut pas passer par un gestionnaire de paquets.",
+  ex:`git submodule add https://github.com/org/lib.git libs/lib
+git commit -m "Ajoute lib en sous-module"
+
+# côté collègue : sans --recurse-submodules, le dossier arrive VIDE
+git clone --recurse-submodules https://github.com/moi/projet.git
+# rattrapage après un clone ordinaire :
+git submodule update --init --recursive`,
+  p:"Un sous-module pointe un commit, pas une branche : il ne se met pas à jour avec git pull. Il faut entrer dans le dossier, mettre à jour, puis committer le nouveau pointeur dans le dépôt parent."
+}
+
+};
+
+/* =======================================================================
+   DONNÉES DE LA CARTE
+   n = note ; ch = enfants ; feuille = nœud sans enfants
+   ======================================================================= */
+const DATA = [
+
+/* 1 ------------------------------------------------------------------ */
+{t:"Concepts & configuration", c:"#2E3A46", ch:[
+  {t:"Le modèle mental", ch:[
+    {t:`Git = historique local · GitHub = hébergement + collaboration`, n:"Git fonctionne sans Internet ; GitHub est un service qui héberge des dépôts Git"},
+    {t:`Répertoire de travail → index (staging) → dépôt local → dépôt distant`, n:"les quatre zones : tout Git consiste à déplacer des fichiers de l'une à l'autre"},
+    {t:`git add`, n:"répertoire de travail → index"},
+    {t:`git commit`, n:"index → dépôt local (crée un point de sauvegarde permanent)"},
+    {t:`git push`, n:"dépôt local → dépôt distant"},
+    {t:`git pull  (= git fetch + git merge)`, n:"dépôt distant → dépôt local"},
+    {t:`Un commit = une photo complète du projet + un parent + un auteur + un message`, n:"identifié par une empreinte SHA-1 : a3f5c9e…"},
+    {t:`HEAD`, n:"pointeur sur « où je me trouve » — en général le dernier commit de la branche courante"},
+    {t:`Une branche n'est qu'un pointeur mobile vers un commit`, n:"c'est pour cela que créer une branche est instantané"}
+  ]},
+  {t:"Installer & vérifier", ch:[
+    {t:`git --version`},
+    {t:`winget install --id Git.Git -e`, n:"Windows · macOS : brew install git · Debian/Ubuntu : sudo apt install git"},
+    {t:`git config --list --show-origin`, n:"toute la configuration et le fichier d'où vient chaque ligne"},
+    {t:`git help commit    ·    git commit --help`, n:"la documentation officielle hors ligne"}
+  ]},
+  {t:"Configuration minimale", ch:[
+    {t:`git config --global user.name "Prénom Nom"`},
+    {t:`git config --global user.email "prenom.nom@exemple.ca"`, n:"le même courriel que sur GitHub, sinon les commits ne vous seront pas attribués"},
+    {t:`git config --global init.defaultBranch main`, n:"nommer main la branche initiale, comme GitHub"},
+    {t:`git config --global core.editor "code --wait"`, n:"VS Code comme éditeur de messages ; sinon nano, vim…"},
+    {t:`git config --global pull.rebase false`, n:"définit le comportement de git pull : merge (false) ou rebase (true) — sans ce réglage, Git réclame un choix"},
+    {t:`git config --global core.autocrlf true`, n:"Windows : convertit les fins de ligne à la volée. macOS/Linux : input"},
+    {t:`git config --global credential.helper manager`, n:"Windows : mémorise l'authentification GitHub"},
+    {t:`git config user.email "autre@exemple.ca"`, n:"sans --global : réglage valable pour ce seul dépôt"}
+  ]},
+  {t:"Alias qui font gagner du temps", ch:[
+    {t:`git config --global alias.st status -sb`},
+    {t:`git config --global alias.lg "log --oneline --graph --decorate --all"`, n:"l'historique en arbre, sur une ligne par commit"},
+    {t:`git config --global alias.last "log -1 HEAD --stat"`},
+    {t:`git config --global alias.unstage "restore --staged"`},
+    {t:`git lg`, n:"s'utilise ensuite comme une commande normale"}
+  ]}
+]},
+
+/* 2 ------------------------------------------------------------------ */
+{t:"Créer ou cloner un dépôt", c:"#1F6E8C", ch:[
+  {t:"Partir de zéro", ch:[
+    {t:`git init`, n:"transforme le dossier courant en dépôt (crée le sous-dossier .git)"},
+    {t:`git init mon-projet`, n:"crée le dossier ET le dépôt"},
+    {t:`git status`, n:"la première commande à taper, toujours"},
+    {t:`git add .    &&    git commit -m "Premier commit"`},
+    {t:`git branch -M main`, n:"renommer la branche courante en main"},
+    {t:`git remote add origin https://github.com/moi/mon-projet.git`},
+    {t:`git push -u origin main`, n:"-u lie la branche locale à la distante : ensuite, git push suffit"}
+  ]},
+  {t:"Cloner un dépôt existant", ch:[
+    {t:`git clone https://github.com/org/projet.git`},
+    {t:`git clone git@github.com:org/projet.git`, n:"en SSH : aucun mot de passe à saisir ensuite"},
+    {t:`git clone <url> dossier-local`, n:"choisir le nom du dossier"},
+    {t:`git clone --depth 1 <url>`, n:"clone superficiel : dernier commit seulement, très rapide sur un gros dépôt"},
+    {t:`git clone -b develop <url>`, n:"cloner directement une autre branche"},
+    {t:`gh repo clone org/projet`, n:"avec GitHub CLI : plus court, gère l'authentification"}
+  ]},
+  {t:".gitignore", ch:[
+    {t:`# fichier .gitignore à la racine du dépôt`, n:"liste ce que Git doit ignorer : Git ne le suivra ni ne le proposera"},
+    {t:`__pycache__/
+*.pyc
+.venv/
+env/`, n:"Python"},
+    {t:`node_modules/
+dist/
+.env`, n:"JavaScript — et .env, qui contient des secrets"},
+    {t:`*.log
+*.tmp
+.DS_Store
+Thumbs.db`, n:"fichiers système et temporaires"},
+    {t:`*.gdb/
+*.lock
+*.sde
+*.mxd`, n:"exemple SIG : géodatabases, verrous ArcGIS"},
+    {t:`!important.log`, n:"le ! ré-inclut une exception"},
+    {t:`git check-ignore -v fichier`, n:"pourquoi ce fichier est-il ignoré ? La réponse donne la règle et sa ligne"},
+    {t:`git rm --cached fichier`, n:"un fichier déjà suivi reste suivi malgré .gitignore : il faut le retirer de l'index"},
+    {t:`https://github.com/github/gitignore`, n:"modèles prêts à l'emploi pour chaque langage"}
+  ]},
+  {t:"Fichiers d'accompagnement", ch:[
+    {t:`README.md`, n:"la vitrine du dépôt : GitHub l'affiche automatiquement en page d'accueil"},
+    {t:`LICENSE`, n:"sans licence, personne n'a légalement le droit de réutiliser votre code"},
+    {t:`.gitattributes`, n:"règles de fins de ligne et de fusion : * text=auto"},
+    {t:`CONTRIBUTING.md   ·   CODE_OF_CONDUCT.md`, n:"attendus sur un projet ouvert"}
+  ]}
+]},
+
+/* 3 ------------------------------------------------------------------ */
+{t:"Le cycle quotidien", c:"#2F6F3E", ch:[
+  {t:"Voir où j'en suis", ch:[
+    {t:`git status`, n:"modifiés, indexés, non suivis — la commande à taper avant et après chaque action"},
+    {t:`git status -sb`, n:"version compacte : deux colonnes de symboles, une ligne par fichier"},
+    {t:`git diff`, n:"ce qui est modifié mais PAS encore indexé"},
+    {t:`git diff --staged`, n:"ce qui est indexé et partira au prochain commit"},
+    {t:`git diff HEAD`, n:"tout ce qui a changé depuis le dernier commit"},
+    {t:`git diff --stat`, n:"résumé : fichiers touchés, lignes ajoutées/supprimées"}
+  ]},
+  {t:"Indexer (add)", ch:[
+    {t:`git add fichier.py`},
+    {t:`git add .`, n:"tout le dossier courant et ses sous-dossiers"},
+    {t:`git add -A`, n:"tout le dépôt, suppressions comprises"},
+    {t:`git add -u`, n:"seulement les fichiers déjà suivis"},
+    {t:`git add -p`, n:"indexer morceau par morceau : la clé pour faire des commits propres à partir d'un travail désordonné"},
+    {t:`git restore --staged fichier`, n:"retirer de l'index sans perdre les modifications"}
+  ]},
+  {t:"Enregistrer (commit)", ch:[
+    {t:`git commit -m "Corrige le calcul des surfaces"`},
+    {t:`git commit -am "…"`, n:"-a indexe automatiquement les fichiers déjà suivis (ignore les nouveaux)"},
+    {t:`git commit`, n:"sans -m : ouvre l'éditeur pour un message long (titre, ligne vide, explication)"},
+    {t:`git commit --amend`, n:"corriger le DERNIER commit : message ou contenu — tant qu'il n'est pas poussé"},
+    {t:`git commit --amend --no-edit`, n:"ajouter un oubli au dernier commit sans toucher au message"},
+    {t:`git commit --allow-empty -m "Déclenche le workflow"`, n:"commit vide, parfois utile pour relancer une CI"}
+  ]},
+  {t:"Écrire un bon message", ch:[
+    {t:`Corrige le calcul des surfaces en projection 2953`, n:"impératif présent, ≤ 50 caractères, dit CE QUE fait le commit"},
+    {t:`feat: ajoute l'export GeoJSON`, n:"convention Conventional Commits : feat, fix, docs, refactor, test, chore"},
+    {t:`fix: …   ·   docs: …   ·   refactor: …   ·   chore: …`},
+    {t:`Ligne vide, puis le POURQUOI sur les lignes suivantes`, n:"le comment se lit dans le diff ; le pourquoi ne s'y lit jamais"},
+    {t:`Fixes #42`, n:"dans le message ou la pull request : ferme automatiquement l'issue 42 sur GitHub"},
+    {t:`Un commit = une idée`, n:"si le message contient « et », c'est probablement deux commits"}
+  ]},
+  {t:"Annuler avant commit", ch:[
+    {t:`git restore fichier`, n:"jette les modifications non indexées du fichier — irréversible"},
+    {t:`git restore .`, n:"⚠ jette TOUTES les modifications non indexées"},
+    {t:`git restore --staged fichier`, n:"désindexe, garde les modifications"},
+    {t:`git checkout -- fichier`, n:"l'ancienne forme, équivalente à git restore"}
+  ]}
+]},
+
+/* 4 ------------------------------------------------------------------ */
+{t:"Explorer l'historique", c:"#6B5A2E", ch:[
+  {t:"git log", ch:[
+    {t:`git log`, n:"q pour sortir du pager"},
+    {t:`git log --oneline`, n:"une ligne par commit : la forme la plus utilisée"},
+    {t:`git log --oneline --graph --decorate --all`, n:"l'arbre complet des branches, en ASCII"},
+    {t:`git log -5`, n:"les 5 derniers"},
+    {t:`git log --author="Issa"`},
+    {t:`git log --since="2 weeks ago" --until="yesterday"`},
+    {t:`git log --grep="surface"`, n:"chercher dans les messages de commit"},
+    {t:`git log -S "ST_Buffer"`, n:"chercher les commits qui ont AJOUTÉ ou SUPPRIMÉ ce texte dans le code"},
+    {t:`git log -- chemin/fichier.py`, n:"l'histoire d'un seul fichier"},
+    {t:`git log --follow -- fichier.py`, n:"suit le fichier même à travers ses renommages"},
+    {t:`git log -p`, n:"avec le diff de chaque commit"},
+    {t:`git shortlog -sn`, n:"nombre de commits par auteur"}
+  ]},
+  {t:"Inspecter un commit", ch:[
+    {t:`git show a3f5c9e`, n:"message + diff complet"},
+    {t:`git show a3f5c9e:chemin/fichier.py`, n:"le contenu d'un fichier tel qu'il était à ce commit"},
+    {t:`git show HEAD~1`, n:"~1 = le parent · ~3 = trois commits en arrière"},
+    {t:`git diff main..develop`, n:"tout ce qui sépare deux branches"},
+    {t:`git diff a3f5c9e b7d2f10 -- fichier.py`}
+  ]},
+  {t:"Qui a écrit quoi", ch:[
+    {t:`git blame fichier.py`, n:"pour chaque ligne : commit, auteur, date"},
+    {t:`git blame -L 40,60 fichier.py`, n:"seulement les lignes 40 à 60"},
+    {t:`git blame -w -C fichier.py`, n:"ignore les changements d'espaces et suit le code déplacé"}
+  ]},
+  {t:"Trouver un commit fautif", ch:[
+    {t:`git bisect start
+git bisect bad
+git bisect good v1.2.0`, n:"recherche dichotomique : Git propose un commit à tester à chaque étape"},
+    {t:`git bisect good   ·   git bisect bad`, n:"votre verdict après chaque test"},
+    {t:`git bisect reset`, n:"revenir à l'état de départ une fois le coupable identifié"},
+    {t:`git bisect run pytest -x`, n:"automatiser : Git trouve seul le commit fautif"}
+  ]}
+]},
+
+/* 5 ------------------------------------------------------------------ */
+{t:"Branches", c:"#2F5FA8", ch:[
+  {t:"Créer & naviguer", ch:[
+    {t:`git branch`, n:"liste les branches locales ; * marque la courante"},
+    {t:`git branch -a`, n:"locales + distantes"},
+    {t:`git switch -c feature/export-geojson`, n:"crée la branche ET s'y place (Git 2.23+)"},
+    {t:`git switch main`, n:"changer de branche"},
+    {t:`git switch -`, n:"revenir à la branche précédente"},
+    {t:`git checkout -b feature/x`, n:"l'ancienne forme de switch -c, toujours valable"},
+    {t:`git switch -c hotfix main`, n:"partir explicitement de main, pas de la branche courante"},
+    {t:`git branch -m ancien-nom nouveau-nom`, n:"renommer"}
+  ]},
+  {t:"Supprimer", ch:[
+    {t:`git branch -d feature/x`, n:"refuse si la branche n'est pas fusionnée : c'est un garde-fou"},
+    {t:`git branch -D feature/x`, n:"force la suppression, travail non fusionné compris"},
+    {t:`git push origin --delete feature/x`, n:"supprimer la branche côté GitHub"},
+    {t:`git fetch --prune`, n:"nettoyer les références locales aux branches distantes disparues"},
+    {t:`git branch --merged`, n:"celles qu'on peut supprimer sans risque"}
+  ]},
+  {t:"Nommer & organiser", ch:[
+    {t:`feature/export-geojson   ·   fix/calcul-surface   ·   docs/readme`, n:"préfixe + description en minuscules et tirets"},
+    {t:`main`, n:"la branche de référence, toujours fonctionnelle"},
+    {t:`develop`, n:"branche d'intégration, dans les organisations qui la pratiquent"},
+    {t:`GitHub Flow`, n:"une branche par sujet, courte, fusionnée par pull request : le modèle le plus simple et le plus répandu"},
+    {t:`Une branche courte`, n:"quelques jours au maximum : plus elle vit, plus la fusion sera douloureuse"}
+  ]}
+]},
+
+/* 6 ------------------------------------------------------------------ */
+{t:"Fusionner, rebaser, conflits", c:"#6B4C9A", ch:[
+  {t:"Merge", ch:[
+    {t:`git switch main
+git merge feature/x`, n:"on se place SUR la branche qui reçoit, puis on fusionne l'autre"},
+    {t:`git merge --no-ff feature/x`, n:"force un commit de fusion : garde la trace visible de la branche"},
+    {t:`git merge --squash feature/x`, n:"écrase les commits de la branche en un seul, à committer ensuite"},
+    {t:`git merge --abort`, n:"tout annuler et revenir avant la fusion"},
+    {t:`Fast-forward`, n:"si rien n'a bougé sur main, Git déplace simplement le pointeur : aucun commit de fusion"}
+  ]},
+  {t:"Rebase", ch:[
+    {t:`git switch feature/x
+git rebase main`, n:"rejoue mes commits par-dessus la version à jour de main : historique linéaire"},
+    {t:`git rebase --continue`, n:"après avoir résolu un conflit"},
+    {t:`git rebase --skip   ·   git rebase --abort`},
+    {t:`git rebase -i HEAD~3`, n:"réécrire les 3 derniers commits : reword, squash, fixup, drop, reorder"},
+    {t:`pick / reword / squash / fixup / drop`, n:"les verbes du rebase interactif"},
+    {t:`git pull --rebase`, n:"récupérer les commits distants sans créer de commit de fusion inutile"},
+    {t:`Ne jamais rebaser ce qui est déjà partagé`, n:"le rebase réécrit l'histoire : sur une branche que d'autres utilisent, il casse leur dépôt"}
+  ]},
+  {t:"Conflits", ch:[
+    {t:`<<<<<<< HEAD
+ma version
+=======
+la version entrante
+>>>>>>> feature/x`, n:"les marqueurs insérés dans le fichier ; il faut choisir, mélanger, puis effacer les marqueurs"},
+    {t:`git status`, n:"liste les fichiers en conflit (« both modified »)"},
+    {t:`git diff --name-only --diff-filter=U`, n:"seulement les fichiers en conflit"},
+    {t:`git add fichier`, n:"marquer le conflit comme résolu"},
+    {t:`git commit`, n:"conclut la fusion (le message est pré-rempli)"},
+    {t:`git checkout --ours fichier   ·   --theirs fichier`, n:"garder entièrement une version ou l'autre"},
+    {t:`git mergetool`, n:"ouvre un outil graphique de résolution"},
+    {t:`git merge --abort   ·   git rebase --abort`, n:"la porte de sortie : on revient en arrière et on recommence à froid"}
+  ]},
+  {t:"Récupérer un commit précis", ch:[
+    {t:`git cherry-pick a3f5c9e`, n:"appliquer un commit d'une autre branche sur la branche courante"},
+    {t:`git cherry-pick a3f5c9e..b7d2f10`, n:"une plage de commits"},
+    {t:`git cherry-pick -n a3f5c9e`, n:"appliquer sans committer, pour ajuster avant"},
+    {t:`git cherry-pick --abort`}
+  ]}
+]},
+
+/* 7 ------------------------------------------------------------------ */
+{t:"Annuler & réparer", c:"#B0431F", ch:[
+  {t:"Choisir la bonne commande", ch:[
+    {t:`restore`, n:"annuler des modifications NON committées"},
+    {t:`amend`, n:"corriger le DERNIER commit, non poussé"},
+    {t:`reset`, n:"reculer la branche : réécrit l'histoire locale"},
+    {t:`revert`, n:"créer un commit qui annule un commit : la seule méthode sûre sur du code déjà poussé"},
+    {t:`reflog`, n:"retrouver ce qu'on croyait perdu"}
+  ]},
+  {t:"reset — les trois modes", ch:[
+    {t:`git reset --soft HEAD~1`, n:"défait le commit, GARDE tout dans l'index : pour recommitter autrement"},
+    {t:`git reset HEAD~1`, n:"mode --mixed par défaut : défait le commit et l'indexation, garde les fichiers"},
+    {t:`git reset --hard HEAD~1`, n:"⚠ défait le commit ET supprime les modifications : irréversible sans reflog"},
+    {t:`git reset --hard origin/main`, n:"aligner brutalement la branche locale sur la distante"},
+    {t:`git reset a3f5c9e`, n:"reculer jusqu'à un commit précis"}
+  ]},
+  {t:"revert — annuler proprement", ch:[
+    {t:`git revert a3f5c9e`, n:"crée un NOUVEAU commit qui défait celui-là ; l'historique reste intact"},
+    {t:`git revert HEAD`, n:"annuler le dernier commit"},
+    {t:`git revert -m 1 <sha-de-fusion>`, n:"annuler une fusion : -m 1 désigne la branche à conserver"},
+    {t:`git revert --no-commit a3f5c9e b7d2f10`, n:"annuler plusieurs commits en un seul"}
+  ]},
+  {t:"reflog — le filet de sécurité", ch:[
+    {t:`git reflog`, n:"journal de TOUS les déplacements de HEAD, y compris ceux effacés de l'historique"},
+    {t:`git reset --hard HEAD@{3}`, n:"revenir à l'état d'il y a trois mouvements"},
+    {t:`git switch -c sauvetage a3f5c9e`, n:"récupérer un commit « perdu » dans une nouvelle branche"},
+    {t:`Rien n'est perdu pendant ~90 jours`, n:"tant qu'un commit existe dans le reflog, il est récupérable"}
+  ]},
+  {t:"Nettoyer", ch:[
+    {t:`git clean -n`, n:"SIMULATION : ce qui serait supprimé. Toujours commencer par là"},
+    {t:`git clean -fd`, n:"supprime les fichiers et dossiers non suivis"},
+    {t:`git clean -fdx`, n:"⚠ y compris ce qui est ignoré (.env, node_modules, .venv)"},
+    {t:`git rm fichier`, n:"supprime le fichier et l'enregistre dans l'index"},
+    {t:`git rm --cached fichier`, n:"retire du suivi Git mais garde le fichier sur le disque"},
+    {t:`git mv ancien nouveau`, n:"renommer en conservant l'historique"}
+  ]}
+]},
+
+/* 8 ------------------------------------------------------------------ */
+{t:"Mettre de côté", c:"#14776E", ch:[
+  {t:"git stash", ch:[
+    {t:`git stash`, n:"range les modifications en cours et rend le dossier propre"},
+    {t:`git stash push -m "wip export csv"`, n:"avec un libellé : indispensable dès qu'il y en a plusieurs"},
+    {t:`git stash -u`, n:"inclut les fichiers non suivis"},
+    {t:`git stash list`, n:"stash@{0}, stash@{1}…"},
+    {t:`git stash pop`, n:"réapplique le dernier et le retire de la pile"},
+    {t:`git stash apply stash@{1}`, n:"réapplique sans retirer de la pile"},
+    {t:`git stash show -p stash@{0}`, n:"voir le contenu avant de l'appliquer"},
+    {t:`git stash drop stash@{0}   ·   git stash clear`, n:"⚠ clear supprime tout"},
+    {t:`git stash branch nouvelle-branche`, n:"créer une branche à partir d'un stash"}
+  ]},
+  {t:"Plusieurs dossiers de travail", ch:[
+    {t:`git worktree add ../projet-hotfix hotfix`, n:"une deuxième copie du dépôt sur une autre branche, sans re-cloner"},
+    {t:`git worktree list`},
+    {t:`git worktree remove ../projet-hotfix`},
+    {t:`À quoi ça sert`, n:"corriger un bug urgent sans ranger ni casser le travail en cours"}
+  ]}
+]},
+
+/* 9 ------------------------------------------------------------------ */
+{t:"Dépôts distants", c:"#A03E6E", ch:[
+  {t:"Configurer les distants", ch:[
+    {t:`git remote -v`, n:"quelles adresses, en lecture et en écriture"},
+    {t:`git remote add origin git@github.com:moi/projet.git`, n:"origin = nom conventionnel du dépôt principal"},
+    {t:`git remote set-url origin git@github.com:moi/projet.git`, n:"basculer de HTTPS vers SSH"},
+    {t:`git remote add upstream https://github.com/org/projet.git`, n:"sur un fork : upstream désigne le dépôt d'origine"},
+    {t:`git remote remove ancien`},
+    {t:`git remote show origin`, n:"état détaillé : branches suivies, à jour ou non"}
+  ]},
+  {t:"Récupérer", ch:[
+    {t:`git fetch`, n:"télécharge les nouveautés SANS toucher à votre travail : sans danger"},
+    {t:`git fetch --all --prune`, n:"tous les distants, et nettoyage des branches supprimées"},
+    {t:`git pull`, n:"fetch + merge : met à jour la branche courante"},
+    {t:`git pull --rebase`, n:"fetch + rebase : historique linéaire, sans commit de fusion"},
+    {t:`git log HEAD..origin/main --oneline`, n:"ce qui est arrivé sur le distant et que je n'ai pas encore"},
+    {t:`git fetch puis git diff main origin/main`, n:"le réflexe prudent : regarder avant d'intégrer"}
+  ]},
+  {t:"Envoyer", ch:[
+    {t:`git push`},
+    {t:`git push -u origin ma-branche`, n:"première fois : crée la branche distante et l'associe"},
+    {t:`git push origin --delete ma-branche`},
+    {t:`git push --tags`, n:"les étiquettes ne partent pas avec un push ordinaire"},
+    {t:`git push --force-with-lease`, n:"réécriture forcée, mais refusée si quelqu'un a poussé entretemps — toujours préférer à --force"},
+    {t:`git push --force`, n:"⚠ écrase le travail des autres sans avertissement"}
+  ]},
+  {t:"Branches de suivi", ch:[
+    {t:`origin/main`, n:"votre copie locale de l'état distant, mise à jour par fetch"},
+    {t:`git branch -vv`, n:"quelle branche locale suit quelle branche distante, et l'écart en commits"},
+    {t:`git branch -u origin/main`, n:"associer la branche courante à une branche distante"},
+    {t:`git switch -c locale origin/distante`, n:"créer une branche locale à partir d'une distante"},
+    {t:`« ahead 2, behind 3 »`, n:"j'ai 2 commits qu'ils n'ont pas, ils en ont 3 que je n'ai pas"}
+  ]}
+]},
+
+/* 10 ----------------------------------------------------------------- */
+{t:"Étiquettes & versions", c:"#7A6A17", ch:[
+  {t:"Poser une étiquette", ch:[
+    {t:`git tag`, n:"lister les étiquettes"},
+    {t:`git tag -a v1.2.0 -m "Version 1.2.0"`, n:"étiquette annotée : datée, signée, avec un message — la forme à utiliser"},
+    {t:`git tag v1.2.0`, n:"étiquette légère : un simple marqueur"},
+    {t:`git tag -a v1.1.0 a3f5c9e`, n:"étiqueter un commit passé"},
+    {t:`git show v1.2.0`},
+    {t:`git push origin v1.2.0`, n:"une étiquette ne part pas toute seule"},
+    {t:`git tag -d v1.2.0   ·   git push origin --delete v1.2.0`},
+    {t:`git describe --tags`, n:"le nom de version lisible du commit courant : v1.2.0-3-ga3f5c9e"}
+  ]},
+  {t:"Numéroter (SemVer)", ch:[
+    {t:`MAJEUR.MINEUR.CORRECTIF`, n:"exemple : 2.4.1"},
+    {t:`MAJEUR`, n:"changement incompatible avec l'existant"},
+    {t:`MINEUR`, n:"nouvelle fonctionnalité, compatible"},
+    {t:`CORRECTIF`, n:"correction de bug, compatible"},
+    {t:`v1.0.0-beta.1`, n:"pré-version"},
+    {t:`CHANGELOG.md`, n:"ce qui a changé, en langage humain, version par version"}
+  ]}
+]},
+
+/* 11 ----------------------------------------------------------------- */
+{t:"GitHub — collaborer", c:"#4A4FA0", ch:[
+  {t:"Fork & contribution externe", ch:[
+    {t:`Fork`, n:"votre copie personnelle d'un dépôt dont vous n'êtes pas membre"},
+    {t:`git remote add upstream https://github.com/org/projet.git`, n:"garder un lien vers le dépôt d'origine"},
+    {t:`git fetch upstream
+git merge upstream/main`, n:"mettre son fork à jour"},
+    {t:`gh repo fork org/projet --clone`, n:"forker et cloner en une commande"},
+    {t:`Dans une organisation`, n:"on ne forke généralement pas : on crée une branche dans le dépôt commun"}
+  ]},
+  {t:"Pull request", ch:[
+    {t:`1. git switch -c fix/nom
+2. commits
+3. git push -u origin fix/nom
+4. ouvrir la PR sur GitHub`, n:"le cycle complet, du début à la fin"},
+    {t:`gh pr create --fill`, n:"crée la PR depuis le terminal, à partir des commits"},
+    {t:`gh pr create --draft`, n:"brouillon : travail en cours, pas encore à relire"},
+    {t:`Titre clair + description : quoi, pourquoi, comment tester`},
+    {t:`Closes #42`, n:"dans la description : l'issue se ferme automatiquement à la fusion"},
+    {t:`gh pr list   ·   gh pr view 12 --web   ·   gh pr checkout 12`, n:"checkout : tester localement la PR d'un collègue"},
+    {t:`gh pr status`, n:"où en sont mes PR et celles qui m'attendent"},
+    {t:`Petite PR = relecture rapide`, n:"au-delà de ~400 lignes, la qualité de la relecture s'effondre"}
+  ]},
+  {t:"Relire (review)", ch:[
+    {t:`Approve   ·   Request changes   ·   Comment`, n:"les trois verdicts possibles"},
+    {t:`Commentaire sur une ligne`, n:"cliquer sur le numéro de ligne dans l'onglet Files changed"},
+    {t:`Suggestion de modification`, n:"bloc \`\`\`suggestion : l'auteur applique le correctif en un clic"},
+    {t:`gh pr review 12 --approve   ·   --request-changes -b "…"`},
+    {t:`CODEOWNERS`, n:"fichier qui désigne les relecteurs obligatoires par dossier"}
+  ]},
+  {t:"Fusionner une PR", ch:[
+    {t:`Merge commit`, n:"garde tous les commits + un commit de fusion : historique complet"},
+    {t:`Squash and merge`, n:"tous les commits deviennent un seul : historique propre — le choix le plus courant"},
+    {t:`Rebase and merge`, n:"rejoue les commits sans commit de fusion : historique parfaitement linéaire"},
+    {t:`gh pr merge 12 --squash --delete-branch`},
+    {t:`Supprimer la branche après fusion`, n:"GitHub le propose : accepter, la branche reste récupérable"}
+  ]},
+  {t:"Issues & organisation", ch:[
+    {t:`gh issue create --title "…" --body "…"`},
+    {t:`gh issue list --assignee @me`},
+    {t:`#42`, n:"référence une issue ; @pseudo mentionne une personne ; org/projet#42 pointe vers un autre dépôt"},
+    {t:`Labels · Milestones · Assignees · Projects`, n:"les outils de tri de GitHub"},
+    {t:`Templates d'issue`, n:".github/ISSUE_TEMPLATE/bug.yml : formulaire imposé aux déclarants"},
+    {t:`Discussions`, n:"pour les questions ouvertes, à distinguer des issues (tâches et bugs)"}
+  ]}
+]},
+
+/* 12 ----------------------------------------------------------------- */
+{t:"GitHub — documenter & publier", c:"#0E6FA8", ch:[
+  {t:"README", ch:[
+    {t:`# Titre du projet`, n:"Markdown : #, ##, **gras**, \`code\`, - liste, [texte](url)"},
+    {t:`À quoi sert le projet · installation · exemple d'usage · licence`, n:"les quatre sections qui rendent un dépôt utilisable par autrui"},
+    {t:`![badge](https://img.shields.io/…)`, n:"badges d'état : build, couverture, version"},
+    {t:`\`\`\`python … \`\`\``, n:"bloc de code avec coloration ; \`\`\`mermaid pour un diagramme"},
+    {t:`- [ ] tâche à faire`, n:"cases à cocher, interactives dans les issues et PR"},
+    {t:`README.md à la racine d'un dossier`, n:"GitHub l'affiche aussi en bas de chaque dossier"}
+  ]},
+  {t:"Licence & gouvernance", ch:[
+    {t:`MIT`, n:"très permissive : faites-en ce que vous voulez, citez l'auteur"},
+    {t:`Apache-2.0`, n:"permissive + clause sur les brevets"},
+    {t:`GPL-3.0`, n:"copyleft : les travaux dérivés doivent rester libres"},
+    {t:`CC-BY-4.0`, n:"pour de la donnée ou de la documentation, pas pour du code"},
+    {t:`Ajouter une licence`, n:"GitHub → Add file → Create new file → nommer LICENSE → « Choose a license template »"}
+  ]},
+  {t:"Releases", ch:[
+    {t:`gh release create v1.2.0 --generate-notes`, n:"notes de version générées à partir des PR fusionnées"},
+    {t:`gh release create v1.2.0 ./dist/app.zip`, n:"joindre des fichiers téléchargeables"},
+    {t:`gh release list   ·   gh release view v1.2.0`},
+    {t:`Une release s'appuie sur une étiquette Git`, n:"pas d'étiquette, pas de release"}
+  ]},
+  {t:"GitHub Pages", ch:[
+    {t:`Settings → Pages → Source : branche main, dossier /docs`, n:"un site statique publié gratuitement"},
+    {t:`https://utilisateur.github.io/projet/`, n:"l'adresse obtenue"},
+    {t:`index.html   ou   README.md`, n:"suffit à publier une page"},
+    {t:`Usage`, n:"documentation, portfolio, carte web légère, démonstration"}
+  ]},
+  {t:"Rendre le dépôt trouvable", ch:[
+    {t:`Description + Topics`, n:"les mots-clés du dépôt : ils alimentent la recherche GitHub"},
+    {t:`Épingler les dépôts sur son profil`, n:"Customize your pins"},
+    {t:`README de profil`, n:"un dépôt portant votre pseudo, avec un README, s'affiche sur votre page de profil"},
+    {t:`Archiver un dépôt`, n:"Settings → Archive : lecture seule, sans le supprimer"}
+  ]}
+]},
+
+/* 13 ----------------------------------------------------------------- */
+{t:"GitHub Actions", c:"#8C1F3D", ch:[
+  {t:"Structure d'un workflow", ch:[
+    {t:`.github/workflows/ci.yml`, n:"l'emplacement obligatoire ; un fichier = un workflow"},
+    {t:`name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: pytest`, n:"un workflow complet et fonctionnel"},
+    {t:`workflow → jobs → steps`, n:"un workflow contient des jobs (parallèles par défaut), chaque job une suite d'étapes"},
+    {t:`uses:`, n:"réutilise une action publiée · run: exécute une commande shell"},
+    {t:`runs-on: ubuntu-latest`, n:"windows-latest et macos-latest existent aussi"}
+  ]},
+  {t:"Déclencheurs", ch:[
+    {t:`on: push`, n:"à chaque push"},
+    {t:`on:
+  push:
+    branches: [main]
+    paths: ['src/**']`, n:"cibler une branche et des chemins"},
+    {t:`on: pull_request`, n:"le plus utile : valider avant fusion"},
+    {t:`on:
+  schedule:
+    - cron: '0 6 * * 1'`, n:"tâche planifiée (ici lundi 6 h UTC)"},
+    {t:`on: workflow_dispatch`, n:"bouton « Run workflow » manuel dans l'onglet Actions"},
+    {t:`on: release: types: [published]`}
+  ]},
+  {t:"Secrets & variables", ch:[
+    {t:`Settings → Secrets and variables → Actions`, n:"où déposer un jeton ou un mot de passe"},
+    {t:`\${{ secrets.MON_JETON }}`, n:"un secret est masqué dans les journaux"},
+    {t:`\${{ secrets.GITHUB_TOKEN }}`, n:"jeton fourni automatiquement à chaque exécution"},
+    {t:`permissions:
+  contents: read`, n:"principe du moindre privilège pour le jeton du workflow"},
+    {t:`\${{ vars.ENVIRONNEMENT }}`, n:"variable non sensible"},
+    {t:`Ne jamais écrire un secret dans le YAML`, n:"le fichier est versionné et public si le dépôt l'est"}
+  ]},
+  {t:"Aller plus loin", ch:[
+    {t:`strategy:
+  matrix:
+    python: ['3.10', '3.11', '3.12']`, n:"tester plusieurs versions en parallèle"},
+    {t:`needs: build`, n:"enchaîner les jobs dans un ordre imposé"},
+    {t:`if: github.ref == 'refs/heads/main'`, n:"exécuter une étape sous condition"},
+    {t:`uses: actions/cache@v4`, n:"mettre en cache les dépendances : des minutes gagnées à chaque exécution"},
+    {t:`concurrency: group: \${{ github.ref }}
+cancel-in-progress: true`, n:"annuler l'exécution précédente quand on repousse"},
+    {t:`gh run list   ·   gh run watch   ·   gh run view --log-failed`, n:"suivre et déboguer depuis le terminal"},
+    {t:`Badge d'état`, n:"![CI](https://github.com/moi/projet/actions/workflows/ci.yml/badge.svg)"}
+  ]}
+]},
+
+/* 14 ----------------------------------------------------------------- */
+{t:"GitHub CLI & API", c:"#37536B", ch:[
+  {t:"Démarrer avec gh", ch:[
+    {t:`winget install --id GitHub.cli`, n:"macOS : brew install gh · Linux : apt install gh"},
+    {t:`gh auth login`, n:"authentification par navigateur : remplace la gestion manuelle des jetons"},
+    {t:`gh auth status`},
+    {t:`gh repo create mon-projet --private --source=. --push`, n:"crée le dépôt distant depuis un dossier local et pousse"},
+    {t:`gh repo view --web`, n:"ouvrir le dépôt courant dans le navigateur"}
+  ]},
+  {t:"Commandes du quotidien", ch:[
+    {t:`gh pr create --fill   ·   gh pr checkout 12   ·   gh pr merge --squash`},
+    {t:`gh issue list --state open --label bug`},
+    {t:`gh run watch`, n:"suivre l'exécution d'un workflow en direct"},
+    {t:`gh release create v1.0.0 --generate-notes`},
+    {t:`gh browse`, n:"ouvre la page GitHub du fichier ou de la ligne courante"},
+    {t:`gh gist create notes.md --public`}
+  ]},
+  {t:"API", ch:[
+    {t:`gh api repos/org/projet`, n:"appel API authentifié, sans jongler avec les jetons"},
+    {t:`gh api repos/org/projet/issues --paginate --jq '.[].title'`, n:"filtrage JSON intégré"},
+    {t:`gh api -X POST repos/org/projet/issues -f title="Bug" -f body="…"`},
+    {t:`https://docs.github.com/rest`, n:"la référence de l'API REST"}
+  ]}
+]},
+
+/* 15 ----------------------------------------------------------------- */
+{t:"Sécurité & authentification", c:"#8A6D1F", ch:[
+  {t:"Clé SSH", ch:[
+    {t:`ssh-keygen -t ed25519 -C "prenom.nom@exemple.ca"`, n:"crée la paire de clés ; la phrase de passe est facultative mais recommandée"},
+    {t:`cat ~/.ssh/id_ed25519.pub`, n:"la clé PUBLIQUE — la seule à copier sur GitHub"},
+    {t:`GitHub → Settings → SSH and GPG keys → New SSH key`},
+    {t:`ssh -T git@github.com`, n:"tester : « Hi pseudo! You've successfully authenticated »"},
+    {t:`~/.ssh/id_ed25519`, n:"la clé PRIVÉE : ne jamais la partager, ne jamais la committer"}
+  ]},
+  {t:"Jetons (HTTPS)", ch:[
+    {t:`Personal Access Token (fine-grained)`, n:"remplace le mot de passe : GitHub n'accepte plus le mot de passe en Git depuis 2021"},
+    {t:`Settings → Developer settings → Personal access tokens`},
+    {t:`Portée minimale et date d'expiration`, n:"un jeton limité au seul dépôt concerné"},
+    {t:`git config --global credential.helper manager`, n:"Windows : le jeton est mémorisé dans le gestionnaire d'identifiants"},
+    {t:`gh auth login`, n:"la voie la plus simple : gh gère le jeton à votre place"}
+  ]},
+  {t:"Protéger la branche principale", ch:[
+    {t:`Settings → Branches → Add rule`, n:"ou Rulesets sur les dépôts récents"},
+    {t:`Require a pull request before merging`, n:"plus de push direct sur main"},
+    {t:`Require approvals (1 ou 2)`},
+    {t:`Require status checks to pass`, n:"la CI doit être verte pour fusionner"},
+    {t:`Do not allow bypassing`, n:"la règle s'applique aussi aux administrateurs"},
+    {t:`Require linear history`, n:"impose squash ou rebase"}
+  ]},
+  {t:"Secrets & analyse", ch:[
+    {t:`.env dans .gitignore`, n:"la première ligne de défense, à écrire AVANT le premier commit"},
+    {t:`.env.example`, n:"versionner la liste des variables attendues, jamais leurs valeurs"},
+    {t:`Secret scanning + Push protection`, n:"Settings → Code security : GitHub bloque un push contenant une clé d'API reconnue"},
+    {t:`Dependabot`, n:"alerte et propose des PR de mise à jour des dépendances vulnérables"},
+    {t:`gitleaks detect`, n:"chercher des secrets dans tout l'historique, en local"},
+    {t:`Un secret poussé est un secret compromis`, n:"le révoquer d'abord, le nettoyer ensuite — jamais l'inverse"}
+  ]},
+  {t:"Signer ses commits", ch:[
+    {t:`git config --global gpg.format ssh`},
+    {t:`git config --global user.signingkey ~/.ssh/id_ed25519.pub`},
+    {t:`git config --global commit.gpgsign true`},
+    {t:`GitHub → SSH and GPG keys → New SSH key → type : Signing key`},
+    {t:`Badge « Verified »`, n:"garantit que le commit vient bien de vous : un nom d'auteur, seul, se falsifie en une commande"}
+  ]}
+]},
+
+/* 16 ----------------------------------------------------------------- */
+{t:"Dépannage & urgences", c:"#A02C2C", ch:[
+  {t:"« J'ai commité au mauvais endroit »", ch:[
+    {t:`git reset --soft HEAD~1`, n:"sur main par erreur : défait le commit, garde le travail indexé"},
+    {t:`git switch -c la-bonne-branche
+git commit -m "…"`, n:"puis on recommitte au bon endroit"},
+    {t:`git cherry-pick <sha>` , n:"le commit est déjà ailleurs : le rapatrier sur la bonne branche"},
+    {t:`git commit --amend`, n:"mauvais message, commit non poussé"},
+    {t:`git rebase -i HEAD~3`, n:"réordonner ou fusionner plusieurs commits mal découpés"}
+  ]},
+  {t:"« J'ai perdu du travail »", ch:[
+    {t:`git reflog`, n:"le premier réflexe : tout y est, y compris après un reset --hard"},
+    {t:`git switch -c sauvetage HEAD@{5}`},
+    {t:`git fsck --lost-found`, n:"retrouver des commits orphelins introuvables autrement"},
+    {t:`git stash list`, n:"le travail est peut-être simplement resté dans un stash"},
+    {t:`Modifications jamais committées`, n:"celles-là, Git ne peut pas les retrouver : c'est la limite du filet"}
+  ]},
+  {t:"« HEAD détachée »", ch:[
+    {t:`git status`, n:"affiche « HEAD detached at a3f5c9e » : vous n'êtes sur aucune branche"},
+    {t:`git switch -`, n:"revenir à la branche précédente si rien n'a été fait"},
+    {t:`git switch -c nouvelle-branche`, n:"conserver le travail fait en état détaché"},
+    {t:`Pourquoi`, n:"un git checkout d'un commit ou d'une étiquette place HEAD hors branche ; committer là laisse un commit orphelin"}
+  ]},
+  {t:"« Le push est refusé »", ch:[
+    {t:`! [rejected] … (fetch first)`, n:"le distant a des commits que vous n'avez pas"},
+    {t:`git pull --rebase   puis   git push`, n:"la réponse dans 90 % des cas"},
+    {t:`git push --force-with-lease`, n:"après un rebase de VOTRE branche uniquement"},
+    {t:`protected branch hook declined`, n:"la branche est protégée : passez par une pull request"},
+    {t:`Permission denied (publickey)`, n:"problème de clé SSH : tester avec ssh -T git@github.com"}
+  ]},
+  {t:"« J'ai poussé un secret »", ch:[
+    {t:`1. Révoquer la clé immédiatement`, n:"la priorité absolue : elle est déjà compromise, même après nettoyage"},
+    {t:`2. git rm --cached .env && git commit`, n:"retirer le fichier du suivi et l'ajouter au .gitignore"},
+    {t:`3. git filter-repo --path .env --invert-paths`, n:"effacer le fichier de TOUT l'historique (outil externe, remplaçant de filter-branch)"},
+    {t:`4. git push --force-with-lease --all`, n:"réécriture du dépôt distant : prévenir l'équipe, chacun devra re-cloner"},
+    {t:`BFG Repo-Cleaner`, n:"alternative plus simple à filter-repo pour ce cas précis"}
+  ]},
+  {t:"Gros fichiers", ch:[
+    {t:`remote: File … is 132.00 MB; this exceeds GitHub's file size limit of 100.00 MB`},
+    {t:`git lfs install
+git lfs track "*.tif"
+git add .gitattributes`, n:"Git LFS : le dépôt ne stocke qu'un pointeur"},
+    {t:`Ne pas versionner les données volumineuses`, n:"rasters, géodatabases, exports : les stocker ailleurs et versionner les scripts qui les produisent"},
+    {t:`git count-objects -vH`, n:"quelle taille fait réellement le dépôt"},
+    {t:`Un fichier ajouté puis supprimé reste dans l'historique`, n:"le supprimer ne réduit pas le poids du dépôt : il faut réécrire l'historique"}
+  ]},
+  {t:"Sous-modules", ch:[
+    {t:`git submodule add https://github.com/org/lib.git libs/lib`},
+    {t:`git clone --recurse-submodules <url>`, n:"sinon les dossiers de sous-modules arrivent vides"},
+    {t:`git submodule update --init --recursive`, n:"la commande de rattrapage après un clone ordinaire"},
+    {t:`Un sous-module pointe un COMMIT précis`, n:"pas une branche : il ne se met pas à jour tout seul"}
+  ]}
+]}
+
+];
+
+/* =======================================================================
+   RENDU
+   ======================================================================= */
+const map = document.getElementById('map');
+const NODE_INDEX = new Map();
+const wires = document.getElementById('wires');
+let leafCount = 0;
+
+function makeNode(node, depth, colour){
+  const sub = document.createElement('div');
+  sub.className = 'sub';
+  const hasCh = node.ch && node.ch.length;
+
+  const nd = document.createElement('div');
+  nd.className = 'node ' + (hasCh ? 'l' + depth : 'leaf');
+
+  if (hasCh){
+    const b = document.createElement('button');
+    b.type = 'button';
+    const car = document.createElement('span');
+    car.className = 'caret'; car.textContent = '▼';
+    const lab = document.createElement('span');
+    lab.className = 'lab'; lab.textContent = node.t;
+    b.append(car, lab);
+    b.addEventListener('click', () => { sub.classList.toggle('collapsed'); draw(); });
+    nd.appendChild(b);
+    NODE_INDEX.set(node.t, sub);
+    if (FICHES[node.t]){
+      const inf = document.createElement('button');
+      inf.type = 'button'; inf.className = 'info'; inf.textContent = 'i';
+      inf.title = 'Explication + exemple concret';
+      inf.setAttribute('aria-label', 'Ouvrir la fiche : ' + node.t);
+      inf.addEventListener('click', e => { e.stopPropagation(); openFiche(node.t); });
+      nd.appendChild(inf);
+    }
+  } else {
+    leafCount++;
+    const code = document.createElement('code');
+    code.textContent = node.t;
+    nd.appendChild(code);
+    if (node.n){
+      const n = document.createElement('span');
+      n.className = 'note'; n.textContent = node.n;
+      nd.appendChild(n);
+    }
+    nd.title = 'Cliquer pour copier';
+    nd.addEventListener('click', () => copy(node.t, nd));
+  }
+  sub.appendChild(nd);
+
+  if (hasCh){
+    const kids = document.createElement('div');
+    kids.className = 'children';
+    node.ch.forEach(c => kids.appendChild(makeNode(c, depth + 1, colour)));
+    sub.appendChild(kids);
+  }
+  return sub;
+}
+
+/* racine + branches */
+const rootSub = document.createElement('div');
+rootSub.className = 'sub';
+const rootNode = document.createElement('div');
+rootNode.className = 'node root';
+rootNode.innerHTML = 'Git<br>+ GitHub<small>DU COMMIT À LA PULL REQUEST</small>';
+rootSub.appendChild(rootNode);
+const branchBox = document.createElement('div');
+branchBox.className = 'children';
+rootSub.appendChild(branchBox);
+
+const legend = document.getElementById('legend');
+DATA.forEach((br, i) => {
+  const sub = makeNode(br, 1, br.c);
+  sub.style.setProperty('--c', br.c);
+  sub.id = 'b' + i;
+  sub.dataset.branch = '1';
+  branchBox.appendChild(sub);
+
+  const chip = document.createElement('button');
+  chip.style.setProperty('--c', br.c);
+  chip.innerHTML = '<i></i>';
+  chip.appendChild(document.createTextNode(br.t));
+  chip.addEventListener('click', () => {
+    sub.classList.remove('collapsed');
+    draw();
+    sub.scrollIntoView({behavior:'smooth', block:'center', inline:'start'});
+  });
+  legend.appendChild(chip);
+});
+map.appendChild(rootSub);
+document.getElementById('count').textContent = leafCount + ' commandes · ' + DATA.length + ' branches';
+
+/* ---------- câbles SVG ---------- */
+function draw(){
+  if (window.innerWidth <= 900){ wires.innerHTML = ''; return; }
+  const box = map.getBoundingClientRect();
+  wires.setAttribute('width', map.scrollWidth);
+  wires.setAttribute('height', map.scrollHeight);
+  wires.setAttribute('viewBox', `0 0 ${map.scrollWidth} ${map.scrollHeight}`);
+  let d = '';
+  map.querySelectorAll('.children').forEach(kids => {
+    if (kids.offsetParent === null) return;
+    const parentNode = kids.previousElementSibling;
+    if (!parentNode || !parentNode.classList.contains('node')) return;
+    const a = parentNode.getBoundingClientRect();
+    const x1 = a.right - box.left, y1 = a.top - box.top + a.height / 2;
+    Array.from(kids.children).forEach(childSub => {
+      const cn = childSub.firstElementChild;
+      if (!cn || childSub.classList.contains('hidden')) return;
+      const b = cn.getBoundingClientRect();
+      const x2 = b.left - box.left - 2, y2 = b.top - box.top + Math.min(b.height / 2, 13);
+      const mx = x1 + (x2 - x1) * 0.55;
+      const depth = childSub.querySelector('.node').className.includes('l1') ? 1
+                  : childSub.querySelector('.node').className.includes('l2') ? 2 : 3;
+      const colour = getComputedStyle(childSub.closest('[data-branch]') || childSub).getPropertyValue('--c') || '#333';
+      const w = depth === 1 ? 2.6 : depth === 2 ? 1.8 : 1;
+      d += `<path d="M${x1},${y1} C${mx},${y1} ${x1 + (x2-x1)*0.45},${y2} ${x2},${y2}" stroke="${colour.trim()}" stroke-width="${w}" opacity="${depth===3?0.45:0.75}"/>`;
+    });
+  });
+  wires.innerHTML = d;
+}
+
+/* ---------- copie ---------- */
+const toast = document.getElementById('toast');
+function copy(txt, el){
+  const done = () => {
+    el.classList.add('copied');
+    setTimeout(() => el.classList.remove('copied'), 700);
+    toast.textContent = 'Copié';
+    toast.classList.add('on');
+    setTimeout(() => toast.classList.remove('on'), 1100);
+  };
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+  function fallback(){
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch(e){}
+    ta.remove();
+  }
+}
+
+/* ---------- filtre ---------- */
+const q = document.getElementById('q');
+function clearMarks(el){
+  el.querySelectorAll('mark').forEach(m => { m.replaceWith(document.createTextNode(m.textContent)); });
+  el.normalize();
+}
+function filter(){
+  const term = q.value.trim().toLowerCase();
+  const all = map.querySelectorAll('.sub');
+  all.forEach(s => s.classList.remove('hidden'));
+  map.querySelectorAll('.node.leaf code, .node .lab').forEach(clearMarks);
+
+  if (!term){
+    resetState();
+    draw();
+    document.getElementById('count').textContent = leafCount + ' commandes · ' + DATA.length + ' branches';
+    return;
+  }
+
+  let hits = 0;
+  map.querySelectorAll('.node.leaf').forEach(leaf => {
+    const txt = leaf.textContent.toLowerCase();
+    const sub = leaf.parentElement;
+    if (txt.includes(term)){
+      hits++;
+      highlight(leaf.querySelector('code'), term);
+      let p = sub;
+      while (p && p !== map){
+        p.classList.remove('hidden','collapsed');
+        p = p.parentElement.closest('.sub');
+      }
+    } else {
+      sub.classList.add('hidden');
+    }
+  });
+  // masquer les sous-branches devenues vides
+  for (let pass = 0; pass < 4; pass++){
+    map.querySelectorAll('.sub').forEach(s => {
+      const kids = s.querySelector(':scope > .children');
+      if (!kids) return;
+      const visible = Array.from(kids.children).some(c => !c.classList.contains('hidden'));
+      if (!visible) s.classList.add('hidden');
+    });
+  }
+  rootSub.classList.remove('hidden');
+  document.getElementById('count').textContent = hits + ' résultat' + (hits > 1 ? 's' : '');
+  draw();
+}
+function highlight(el, term){
+  if (!el) return;
+  const txt = el.textContent, i = txt.toLowerCase().indexOf(term);
+  if (i < 0) return;
+  el.textContent = '';
+  el.append(
+    document.createTextNode(txt.slice(0, i)),
+    Object.assign(document.createElement('mark'), {textContent: txt.slice(i, i + term.length)}),
+    document.createTextNode(txt.slice(i + term.length))
+  );
+}
+let tmr;
+q.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(filter, 140); });
+document.getElementById('clr').addEventListener('click', () => { q.value = ''; filter(); q.focus(); });
+
+
+/* ---------- panneau de fiche ---------- */
+const fiche = document.getElementById('fiche');
+const fBody = document.getElementById('fiche-body');
+const fTitre = document.getElementById('fiche-titre');
+const fKind = document.getElementById('fiche-kind');
+
+function el(tag, cls, txt){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt !== undefined) e.textContent = txt;
+  return e;
+}
+
+function openFiche(key){
+  const f = FICHES[key];
+  if (!f) return;
+  const node = NODE_INDEX.get(key);
+  const branch = node ? node.closest('[data-branch]') : null;
+  const colour = branch ? getComputedStyle(branch).getPropertyValue('--c').trim() : '#2E3A46';
+  fiche.style.setProperty('--c', colour);
+
+  fTitre.textContent = f.ti || key;
+  fKind.textContent = key.startsWith('__') ? 'Guide' : (branch && branch.id === (node && node.id) ? 'Branche' : 'Sous-branche');
+  fBody.innerHTML = '';
+
+  fBody.appendChild(el('h3', null, 'À quoi ça sert'));
+  fBody.appendChild(el('p', null, f.q));
+
+  if (f.li){
+    const ul = el('ul');
+    f.li.forEach(t => { const li = el('li'); li.innerHTML = t; ul.appendChild(li); });
+    fBody.appendChild(ul);
+  }
+
+  if (f.ex){
+    fBody.appendChild(el('h3', null, 'Exemple concret'));
+    const pre = el('pre', null, f.ex);
+    fBody.appendChild(pre);
+    const cp = el('button', 'excopy', 'Copier l\u2019exemple');
+    cp.addEventListener('click', () => { copy(f.ex, cp); });
+    fBody.appendChild(cp);
+  }
+
+  if (f.p){
+    fBody.appendChild(el('h3', null, 'Piège fréquent'));
+    fBody.appendChild(el('div', 'piege', f.p));
+  }
+
+  if (f.see && f.see.length){
+    fBody.appendChild(el('h3', null, 'Voir aussi dans la carte'));
+    const box = el('div', 'voir');
+    f.see.forEach(t => {
+      const b = el('button', null, t);
+      b.addEventListener('click', () => gotoNode(t));
+      box.appendChild(b);
+    });
+    fBody.appendChild(box);
+  }
+
+  if (f.doc && f.doc.length){
+    fBody.appendChild(el('h3', null, 'Pour aller plus loin'));
+    const box = el('div', 'liens');
+    f.doc.forEach(d => {
+      const a = document.createElement('a');
+      a.href = d[0]; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = d[1];
+      box.appendChild(a);
+    });
+    fBody.appendChild(box);
+  }
+
+  fiche.classList.add('on');
+  fiche.setAttribute('aria-hidden', 'false');
+  fBody.scrollTop = 0;
+  document.getElementById('fiche-close').focus();
+}
+
+function closeFiche(){
+  fiche.classList.remove('on');
+  fiche.setAttribute('aria-hidden', 'true');
+}
+
+function gotoNode(titre){
+  const node = NODE_INDEX.get(titre);
+  if (!node) return;
+  let p = node;
+  while (p && p !== map){ p.classList.remove('collapsed','hidden'); p = p.parentElement.closest('.sub'); }
+  draw();
+  node.scrollIntoView({behavior:'smooth', block:'center', inline:'nearest'});
+  const nd = node.firstElementChild;
+  nd.classList.add('flash');
+  setTimeout(() => nd.classList.remove('flash'), 1800);
+  if (FICHES[titre]) openFiche(titre);
+}
+
+document.getElementById('fiche-close').addEventListener('click', closeFiche);
+document.getElementById('aide').addEventListener('click', () => openFiche('__UI'));
+document.getElementById('guide').addEventListener('click', () => openFiche('__PARCOURS'));
+
+/* ---------- commandes ---------- */
+document.getElementById('expand').addEventListener('click', () => {
+  map.querySelectorAll('.sub').forEach(s => s.classList.remove('collapsed')); draw();
+});
+document.getElementById('collapse').addEventListener('click', () => { resetState(); draw(); });
+document.getElementById('print').addEventListener('click', () => {
+  map.querySelectorAll('.sub').forEach(s => s.classList.remove('collapsed'));
+  draw(); setTimeout(() => window.print(), 250);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && fiche.classList.contains('on')){ closeFiche(); return; }
+  if (e.key === '/' && document.activeElement !== q){ e.preventDefault(); q.focus(); }
+  if (e.key === 'Escape' && document.activeElement === q){ q.value = ''; filter(); }
+});
+
+/* ---------- état initial : branches ouvertes, sous-branches repliées ---------- */
+function resetState(){
+  map.querySelectorAll('.sub').forEach(s => {
+    s.classList.remove('collapsed');
+    const n = s.firstElementChild;
+    if (n && n.classList.contains('l2')) s.classList.add('collapsed');
+  });
+}
+resetState();
+window.addEventListener('resize', () => { clearTimeout(tmr); tmr = setTimeout(draw, 120); });
+window.addEventListener('load', draw);
+draw();
+setTimeout(draw, 400);
+</script>
+</body>
+</html>
